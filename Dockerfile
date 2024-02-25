@@ -22,4 +22,4 @@ ENTRYPOINT [ "python" ]
 
 
 # Run the application
-CMD ["app.py", "run", "--host=0.0.0.0", "--port=9001"]
+CMD ["app.py", "run", "--host=0.0.0.0", "--port=5030"]

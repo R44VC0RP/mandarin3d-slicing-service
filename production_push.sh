@@ -13,8 +13,8 @@ docker tag mandarin3d:latest mandarin3d/mandarin3d-slicer:$VERSION
 docker tag mandarin3d:latest mandarin3d/mandarin3d-slicer:latest
 
 # Pushing both tags
-docker push mandarin3d/mandarin3d-release:$VERSION
-docker push mandarin3d/mandarin3d-release:latest
+docker push mandarin3d/mandarin3d-slicer:$VERSION
+docker push mandarin3d/mandarin3d-slicer:latest
 
 echo "Docker Images Uploaded: latest and $VERSION."
 
