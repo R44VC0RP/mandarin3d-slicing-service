@@ -7,6 +7,7 @@ import printslicer as ps
 import imagerender as ir
 import connector as cn
 import logging
+import gc
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', filename='slicer.log', filemode='w')
 
 
@@ -74,6 +75,9 @@ def process_files(prefix):
                     upload_single_file(png_path, prefix)
                     # Remove the PNG file after uploading
                     os.remove(png_path)
+                    prefix_png = png_path.split("/")[-1]
+                    png_url = f"https://s2.mandarin3d.com/{prefix}/{prefix_png}"
+                    
                 
                 # After processing, delete the original STL file
                 logging.info(f"Deleting STL file {location}")
@@ -84,12 +88,14 @@ def process_files(prefix):
                 mass = response['mass']
                 pricing = caclulate_pricing_tiers(mass)
                 # Update the order with the calculated mass and pricing information
-                cn.update_order(prefix, file, mass, pricing, png_path)
+
+                cn.update_order(prefix, file, mass, pricing, png_url)
             else:
                 # If the mass calculation failed, update the order status accordingly
                 cn.update_order_failed_slice(prefix, file, response['message'])
                 logging.error(f"Failed to slice file {file}. Reason: {response['message']}")
     logging.info(f"Finished processing files for {prefix}")
+    gc.collect()
 
 
             

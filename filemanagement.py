@@ -37,7 +37,8 @@ def upload_single_file(file_or_path, prefix, filename=None):
             # Use the provided filename or extract from the file path
             secure_name = secure_filename(filename if filename else os.path.basename(file_path))
             with open(file_path, 'rb') as file:
-                client.upload_fileobj(file, bucket_name, f'{prefix}/{secure_name}')
+                client.upload_fileobj(file, bucket_name, f'{prefix}/_{secure_name}')
+
         else:  # It's a file object
             secure_name = secure_filename(file_or_path.filename)
             client.upload_fileobj(file_or_path, bucket_name, f'{prefix}/{secure_name}')

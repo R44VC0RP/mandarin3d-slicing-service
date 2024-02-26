@@ -2,7 +2,7 @@ import subprocess
 import re
 import os
 import logging
-import logging
+import random
 
 # Set up the logger
 #setup_logging()
@@ -11,13 +11,14 @@ import logging
 
 
 def get_mass(filename):
+    instance_hash = f"mass_{random.randint(100000, 999999)}"
     response = {}
     try:
         relative_slic3r_dir = 'Slic3r'
         slic3r_dir = os.path.join(os.getcwd(), relative_slic3r_dir)
         slic3r_exec = os.path.join(slic3r_dir, 'Slic3r')
         base_name, _ = os.path.splitext(os.path.basename(filename))
-        gcode_file = os.path.join(os.path.dirname(filename), f'{base_name}.gcode')
+        gcode_file = os.path.join(os.path.dirname(filename), f'{instance_hash}_{base_name}.gcode')
 
         # Slice the STL file to G-code
         slice_command = f'{slic3r_exec} --load config.ini "{filename}" --support-material -o "{gcode_file}"'
