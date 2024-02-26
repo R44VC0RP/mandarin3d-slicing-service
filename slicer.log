@@ -1,0 +1,74 @@
+2024-02-26 13:46:57,461 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5030
+ * Running on http://192.168.50.201:5030
+2024-02-26 13:46:57,461 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2024-02-26 13:47:52,735 - werkzeug - INFO - 192.168.50.18 - - [26/Feb/2024 13:47:52] "[35m[1mPOST /api/slice/or_pxykw7jfqad HTTP/1.1[0m" 202 -
+2024-02-26 13:47:53,189 - root - INFO - Files found: ['or_pxykw7jfqad/Shamrock_Cookie_Cutter.png', 'or_pxykw7jfqad/Shamrock_Cookie_Cutter.stl', 'or_pxykw7jfqad/Simple_Shotglass.png', 'or_pxykw7jfqad/Simple_Shotglass.stl']
+2024-02-26 13:47:53,189 - root - INFO - Processing file or_pxykw7jfqad/Shamrock_Cookie_Cutter.stl
+2024-02-26 13:47:54,118 - werkzeug - INFO - 192.168.50.18 - - [26/Feb/2024 13:47:54] "[35m[1mPOST /api/slice/or_78pj8cnmmdc HTTP/1.1[0m" 202 -
+2024-02-26 13:47:54,396 - root - INFO - Files found: ['or_78pj8cnmmdc/Bathtub_Boat_Visual_Benchy.png', 'or_78pj8cnmmdc/Bathtub_Boat_Visual_Benchy.stl']
+2024-02-26 13:47:54,397 - root - INFO - Processing file or_78pj8cnmmdc/Bathtub_Boat_Visual_Benchy.stl
+2024-02-26 13:47:55,711 - root - INFO - Stdout: HELLO
+=> Infilling layers
+=> Processing triangulated mesh
+=> Preparing infill
+=> Generating support material
+=> Weight: 0.0g, Cost: 1363669162611.8
+=> Generating skirt
+=> Generating brim
+=> Exporting G-code to /home/ryan/docker_build/mandarin3d_slicing/tmp/or_pxykw7jfqad/mass_334309_Shamrock_Cookie_Cutter.gcode
+Done. Process took 0 minutes and 1.561 seconds
+Filament required: 3544.4mm (8.5cm3)
+
+2024-02-26 13:47:55,711 - root - INFO - Stderr: 
+2024-02-26 13:47:55,711 - root - INFO - Filename: /home/ryan/docker_build/mandarin3d_slicing/tmp/or_pxykw7jfqad/Shamrock_Cookie_Cutter.stl and Mass: 10.625 g
+2024-02-26 13:47:55,712 - root - INFO - Deleted /home/ryan/docker_build/mandarin3d_slicing/tmp/or_pxykw7jfqad/mass_334309_Shamrock_Cookie_Cutter.gcode
+2024-02-26 13:47:55,712 - root - INFO - Mass response: {'status': 200, 'mass': 10.625}
+2024-02-26 13:47:55,712 - root - INFO - Rendering STL to PNG
+2024-02-26 13:47:57,565 - root - INFO - Uploading PNG to S3
+2024-02-26 13:47:58,701 - root - INFO - Deleting STL file /home/ryan/docker_build/mandarin3d_slicing/tmp/or_pxykw7jfqad/Shamrock_Cookie_Cutter.stl
+2024-02-26 13:47:58,702 - root - INFO - Deleted STL file /home/ryan/docker_build/mandarin3d_slicing/tmp/or_pxykw7jfqad/Shamrock_Cookie_Cutter.stl
+2024-02-26 13:47:59,052 - root - INFO - Processing file or_pxykw7jfqad/Simple_Shotglass.stl
+2024-02-26 13:48:02,930 - root - INFO - Stdout: HELLO
+=> Infilling layers
+=> Processing triangulated mesh
+=> Preparing infill
+=> Generating support material
+=> Weight: 0.0g, Cost: 136723008760945579386692032464269005830810521962424627508965184675495272406676465824041034980729134847871393914251158295882054432919811836556553347252209345101824.0
+=> Generating skirt
+=> Generating brim
+=> Exporting G-code to /home/ryan/docker_build/mandarin3d_slicing/tmp/or_pxykw7jfqad/mass_602611_Simple_Shotglass.gcode
+Done. Process took 0 minutes and 2.833 seconds
+Filament required: 9885.4mm (23.8cm3)
+
+2024-02-26 13:48:02,931 - root - INFO - Stderr: 
+2024-02-26 13:48:02,931 - root - INFO - Filename: /home/ryan/docker_build/mandarin3d_slicing/tmp/or_pxykw7jfqad/Simple_Shotglass.stl and Mass: 29.75 g
+2024-02-26 13:48:02,931 - root - INFO - Deleted /home/ryan/docker_build/mandarin3d_slicing/tmp/or_pxykw7jfqad/mass_602611_Simple_Shotglass.gcode
+2024-02-26 13:48:02,931 - root - INFO - Mass response: {'status': 200, 'mass': 29.75}
+2024-02-26 13:48:02,931 - root - INFO - Rendering STL to PNG
+2024-02-26 13:48:04,088 - root - INFO - Uploading PNG to S3
+2024-02-26 13:48:04,987 - root - INFO - Deleting STL file /home/ryan/docker_build/mandarin3d_slicing/tmp/or_pxykw7jfqad/Simple_Shotglass.stl
+2024-02-26 13:48:04,987 - root - INFO - Deleted STL file /home/ryan/docker_build/mandarin3d_slicing/tmp/or_pxykw7jfqad/Simple_Shotglass.stl
+2024-02-26 13:48:05,170 - root - INFO - Finished processing files for or_pxykw7jfqad
+2024-02-26 13:48:32,657 - root - INFO - Stdout: HELLO
+=> Infilling layers
+=> Processing triangulated mesh
+=> Preparing infill
+=> Generating support material
+=> Weight: 0.0g, Cost: 136723008760945579386692032464269005830810521962424627508965184675495272406676465824041034980729134847871393914251158295882054432919811836556553347252209345101824.0
+=> Generating skirt
+=> Generating brim
+=> Exporting G-code to /home/ryan/docker_build/mandarin3d_slicing/tmp/or_78pj8cnmmdc/mass_289987_Bathtub_Boat_Visual_Benchy.gcode
+Done. Process took 0 minutes and 36.457 seconds
+Filament required: 21689.9mm (52.2cm3)
+
+2024-02-26 13:48:32,657 - root - INFO - Stderr: 
+2024-02-26 13:48:32,657 - root - INFO - Filename: /home/ryan/docker_build/mandarin3d_slicing/tmp/or_78pj8cnmmdc/Bathtub_Boat_Visual_Benchy.stl and Mass: 65.25 g
+2024-02-26 13:48:32,661 - root - INFO - Deleted /home/ryan/docker_build/mandarin3d_slicing/tmp/or_78pj8cnmmdc/mass_289987_Bathtub_Boat_Visual_Benchy.gcode
+2024-02-26 13:48:32,661 - root - INFO - Mass response: {'status': 200, 'mass': 65.25}
+2024-02-26 13:48:32,661 - root - INFO - Rendering STL to PNG
+2024-02-26 13:49:07,319 - root - INFO - Uploading PNG to S3
+2024-02-26 13:49:08,408 - root - INFO - Deleting STL file /home/ryan/docker_build/mandarin3d_slicing/tmp/or_78pj8cnmmdc/Bathtub_Boat_Visual_Benchy.stl
+2024-02-26 13:49:08,412 - root - INFO - Deleted STL file /home/ryan/docker_build/mandarin3d_slicing/tmp/or_78pj8cnmmdc/Bathtub_Boat_Visual_Benchy.stl
+2024-02-26 13:49:08,516 - root - INFO - Finished processing files for or_78pj8cnmmdc
