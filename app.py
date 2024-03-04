@@ -27,7 +27,9 @@ if not os.path.exists(tmp_directory):
     os.makedirs(tmp_directory)
 
 def caclulate_pricing_tiers(mass):
+    mass = float(mass)
     spool_price = cn.get_price_per_spool()
+    logging.info(f"Spool price: {spool_price}")
     price_per_gram = float(spool_price) / 1000
     good_price = round(mass * price_per_gram * 1.1, 2)
     better_price = round(mass * price_per_gram * 1.2, 2)
@@ -109,6 +111,23 @@ def handle_request(prefix):
         return jsonify({"message": f"Process started for {prefix}"}), 202
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/slice/manual/<prefix>', methods=['POST'])
+def handle_manual_request(prefix):
+    data = request.get_json()
+    name = data['name'] 
+    mass = data['mass']
+    order_number = data['order_number']
+
+    pricing = caclulate_pricing_tiers(mass)
+
+    png = "https://s2.mandarin3d.com/manual-m.png"
+
+    filename = prefix + "/" + name
+
+    cn.update_order(prefix, filename, mass, pricing, png)
+
+    return jsonify({"message": f"Sliced Order Successfuly for {order_number}"}), 202
 
 # run app so it can be run with flask
 if __name__ == "__main__":

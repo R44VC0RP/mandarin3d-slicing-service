@@ -1,6 +1,7 @@
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 import os
+import logging
 
 # Get MongoDB connection string from environment variable
 MONGO_DB_CONNECTION_STRING = "mongodb+srv://mandarin3d_access:I9DroD4YdgMpwF5I@cluster0.gkeabiy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
@@ -32,8 +33,24 @@ def update_order_failed_slice(prefix, filename, message):
 
 def update_order(prefix, filename, mass, pricing, png_path):
     """Update an order in MongoDB."""
-    documentFound = db.orders.find_one({"order_id": prefix})
+    document_found = db.orders.find_one({"order_id": prefix})
     fileid_active = None
+    logging.info(document_found['files'])
+    for fileid, fileinfo in document_found['files'].items():
+        if fileinfo['url'] == filename:
+            fileid_active = fileid
+            break
+    if fileid_active:
+        document_found['files'][fileid_active]['pricing'] = pricing
+        document_found['files'][fileid_active]['mass'] = mass
+        document_found['files'][fileid_active]['status'] = "good"
+        document_found['files'][fileid_active]['image'] = png_path
+        db.orders.update_one({"order_id": prefix}, {"$set": {"files": document_found['files']}})
+    else:
+        print(f"No matching file found for {filename} in order {prefix}.")
+
+def update_order_manual_slice(prefix, filename, mass, pricing, png_path):
+    docuemntFound = db.orders.find_one({"order_id": prefix})
     for fileid, fileinfo in documentFound['files'].items():
         if fileinfo['url'] == filename:
             fileid_active = fileid
@@ -45,7 +62,9 @@ def update_order(prefix, filename, mass, pricing, png_path):
         documentFound['files'][fileid_active]['image'] = png_path
         db.orders.update_one({"order_id": prefix}, {"$set": {"files": documentFound['files']}})
     else:
-        print(f"No matching file found for {filename} in order {prefix}.")
+        logging.error(f"No matching file found for {filename} in order {prefix}.")
+    logging.error(f"Order {prefix} failed to slice. Reason: {message}")
+
 def update_order_failed_slice(prefix, filename, message):
     """Update an order in MongoDB."""
 
