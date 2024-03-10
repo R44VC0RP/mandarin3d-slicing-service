@@ -1,0 +1,36 @@
+Metadata-Version: 2.1
+Name: vtkplotlib
+Version: 2.1.1
+Summary: High level 3D graphics and plotting powered by VTK
+Home-page: https://vtkplotlib.readthedocs.io/en/latest/index.html
+Author: Brénainn Woodsend
+Author-email: bwoodsend@gmail.com
+License: MIT
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE.txt
+Requires-Dist: vtk
+Requires-Dist: numpy
+Requires-Dist: matplotlib
+Provides-Extra: test_full
+Requires-Dist: pytest ; extra == 'test_full'
+Requires-Dist: pytest-order ; extra == 'test_full'
+Requires-Dist: PyQt6 ; extra == 'test_full'
+Requires-Dist: numpy-stl ; extra == 'test_full'
+Requires-Dist: namegenerator ; extra == 'test_full'
+Requires-Dist: pillow ; extra == 'test_full'
+Provides-Extra: test_minimal
+Requires-Dist: pytest ; extra == 'test_minimal'
+Requires-Dist: pytest-order ; extra == 'test_minimal'
+
+Welcome to vtkplotlib!
+====================================
+
+
+
+Our homepage and quickstart page is hosted on [readthedocs](https://vtkplotlib.readthedocs.io/en/latest/index.html).
+
+Our github page can be found [here](https://github.com/bwoodsend/vtkplotlib).
+
+Releases are hosted on [PyPi](https://pypi.org/project/vtkplotlib/).
+

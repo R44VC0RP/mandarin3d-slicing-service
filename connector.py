@@ -83,3 +83,8 @@ def update_order_failed_slice(prefix, filename, message):
     print(f"Order {prefix} failed to slice. Reason: {message}")
     return "Order updated successfully."
 
+def upload_stats(prefix, file, stats):
+    """Upload slicing stats to MongoDB."""
+    db.slicing_stats.insert_one({"order_id": prefix, "stats": stats, "file": file})
+    return "Stats uploaded successfully."
+
