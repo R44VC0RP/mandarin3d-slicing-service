@@ -31,7 +31,7 @@ def update_order_failed_slice(prefix, filename, message):
     print(f"Order {prefix} failed to slice. Reason: {message}")
     return "Order updated successfully."
 
-def update_order(prefix, filename, mass, pricing, png_path):
+def update_order(prefix, filename, mass, pricing):
     """Update an order in MongoDB."""
     document_found = db.orders.find_one({"order_id": prefix})
     fileid_active = None
@@ -44,7 +44,6 @@ def update_order(prefix, filename, mass, pricing, png_path):
         document_found['files'][fileid_active]['pricing'] = pricing
         document_found['files'][fileid_active]['mass'] = mass
         document_found['files'][fileid_active]['status'] = "good"
-        document_found['files'][fileid_active]['image'] = png_path
         db.orders.update_one({"order_id": prefix}, {"$set": {"files": document_found['files']}})
     else:
         print(f"No matching file found for {filename} in order {prefix}.")

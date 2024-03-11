@@ -19,8 +19,8 @@ RUN rm -rf /app/venv
 RUN chmod -R 777 /app/Slic3r
 
 # configure the container to run in an executed manner
-ENTRYPOINT [ "python" ]
+ENTRYPOINT ["gunicorn"]
 
+# Run the application using Gunicorn
+CMD ["app:app", "--bind", "0.0.0.0:5030", "--workers", "8"]
 
-# Run the application
-CMD ["app.py", "run", "--host=0.0.0.0", "--port=5030"]
