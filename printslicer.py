@@ -28,8 +28,8 @@ def get_mass(filename):
         
         stdout = result.stdout
         stderr = result.stderr
-        logging.info(f'Stdout: {stdout}')
-        logging.info(f'Stderr: {stderr}')
+        # logging.info(f'Stdout: {stdout}')
+        # logging.info(f'Stderr: {stderr}')
         
         volume_match = re.search(r'Filament required: \d+\.\d+mm \((\d+\.\d+)cm3\)', stdout)
         
@@ -37,7 +37,7 @@ def get_mass(filename):
             volume_cm3 = float(volume_match.group(1))  # Volume in cubic centimeters
             density = 1.25  # Density of the material in g/cm³ (assuming PLA)
             mass = volume_cm3 * density  # Mass in grams
-            logging.info(f"Filename: {filename} and Mass: {mass} g")
+            # logging.info(f"Filename: {filename} and Mass: {mass} g")
             response['status'] = 200
             response['mass'] = mass
         else:
@@ -48,7 +48,7 @@ def get_mass(filename):
         # Delete the G-code file
         if os.path.exists(gcode_file):
             os.remove(gcode_file)
-            logging.info(f'Deleted {gcode_file}')
+            # logging.info(f'Deleted {gcode_file}')
         else:
             logging.error(f'{gcode_file} does not exist')
             if 'error' not in response:
@@ -61,3 +61,53 @@ def get_mass(filename):
         response['error'] = f'Error processing file: {str(e)}'
 
     return response
+
+
+def run_slicer_command_and_extract_info(directory_to_stl, filename):
+    logging.info(f"{filename} - Running slicer command on directory: {directory_to_stl}")
+    
+    command = ['./slicersuper', '--repair', '--export-gcode', '-o', 'output.gcode', directory_to_stl, '--info']
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=240)
+    except subprocess.TimeoutExpired:
+        logging.error(f"{filename} - Slicer command timed out.")
+        response = {
+            "status": 400,
+            "error": "Slicer command timed out."
+        }
+        return response
+
+    response = {
+        "status": 200
+    }
+
+    
+    # Extracting information from STDOUT
+    logging.info(f"{filename} - Extracting slicing information from command output.")
+    volume_pattern = r"volume = (\d+\.\d+)"
+    size_x_pattern = r"size_x = (\d+\.\d+)"
+    size_y_pattern = r"size_y = (\d+\.\d+)"
+    size_z_pattern = r"size_z = (\d+\.\d+)"
+    volume_match = re.search(volume_pattern, result.stdout)
+    size_x_match = re.search(size_x_pattern, result.stdout)
+    size_y_match = re.search(size_y_pattern, result.stdout)
+    size_z_match = re.search(size_z_pattern, result.stdout)
+    
+    if volume_match and size_x_match and size_y_match and size_z_match:
+        logging.info(f"{filename} - Successfully extracted slicing information.")
+        slicing_info = {
+            "volume": float(volume_match.group(1)),
+            "size_x": float(size_x_match.group(1)),
+            "size_y": float(size_y_match.group(1)),
+            "size_z": float(size_z_match.group(1))
+        }
+        response['mass'] = slicing_info['volume'] / 1000 * 1.25  # Assuming PLA with density 1.25 g/cm³
+        response['size_x'] = slicing_info['size_x']
+        response['size_y'] = slicing_info['size_y']
+        response['size_z'] = slicing_info['size_z']
+        return response
+    else:
+        logging.error(f"{filename} - Failed to extract slicing information from command output.")
+        response['status'] = 400
+        response['error'] = "Failed to extract slicing information from command output."
+        return response

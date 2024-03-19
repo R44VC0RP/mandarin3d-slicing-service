@@ -25,17 +25,12 @@ def get_price_per_spool():
     """Get the price per spool from MongoDB."""
     return db.config.find_one({"config": "config"})['spool_price']
 
-def update_order_failed_slice(prefix, filename, message):
-    """Update an order in MongoDB."""
-    db.orders.update_one({"order_id": prefix}, {"$set": {"status": "failed", "message": message}})
-    print(f"Order {prefix} failed to slice. Reason: {message}")
-    return "Order updated successfully."
+
 
 def update_order(prefix, filename, mass, pricing):
     """Update an order in MongoDB."""
     document_found = db.orders.find_one({"order_id": prefix})
     fileid_active = None
-    logging.info(document_found['files'])
     for fileid, fileinfo in document_found['files'].items():
         if fileinfo['url'] == filename:
             fileid_active = fileid
@@ -47,6 +42,28 @@ def update_order(prefix, filename, mass, pricing):
         db.orders.update_one({"order_id": prefix}, {"$set": {"files": document_found['files']}})
     else:
         print(f"No matching file found for {filename} in order {prefix}.")
+
+def update_file(filename, mass, pricing):
+    """Update an order in MongoDB."""
+    document_found = db.files.find_one({"url": filename})
+
+    if document_found:
+        document_found['pricing'] = pricing
+        document_found['mass'] = mass
+        document_found['status'] = "good"
+        db.files.update_one({"url": filename}, {"$set": document_found})
+    else:
+        logging.error(f"File {filename} not found.")
+
+def update_file_failed(filename, message):
+    """Update an order in MongoDB."""
+    document_found = db.files.find_one({"url": filename})
+    if document_found:
+        document_found['status'] = "failed"
+        document_found['message'] = message
+        db.files.update_one({"url": filename}, {"$set": document_found})
+    else:
+        logging.error(f"File {filename} not found.")
 
 def update_order_manual_slice(prefix, filename, mass, pricing, png_path):
     docuemntFound = db.orders.find_one({"order_id": prefix})
@@ -86,4 +103,8 @@ def upload_stats(prefix, file, stats):
     """Upload slicing stats to MongoDB."""
     db.slicing_stats.insert_one({"order_id": prefix, "stats": stats, "file": file})
     return "Stats uploaded successfully."
+
+def get_profit_margin():
+    """Get the profit margin from the database"""
+    return db.config.find_one({"config": "config"})['profit_margin']
 
