@@ -3,6 +3,19 @@ import re
 import os
 import logging
 import random
+from stl import mesh
+import numpy as np
+
+def scale_stl(filename, scale_factor, output_filename):
+    # Load the STL file
+    your_mesh = mesh.Mesh.from_file(filename)
+    
+    # Scale the mesh
+    your_mesh.vectors *= scale_factor
+    
+    # Save the scaled mesh
+    your_mesh.save(output_filename)
+    print(f"Saved scaled STL to {output_filename}")
 
 # Set up the logger
 #setup_logging()
@@ -28,6 +41,11 @@ def get_mass(filename):
         
         stdout = result.stdout
         stderr = result.stderr
+
+        with open("slicer_output.txt", "w") as f:
+            f.write(stdout)
+        with open("slicer_error.txt", "w") as f:
+            f.write(stderr)
         # logging.info(f'Stdout: {stdout}')
         # logging.info(f'Stderr: {stderr}')
         
@@ -65,8 +83,11 @@ def get_mass(filename):
 
 def run_slicer_command_and_extract_info(directory_to_stl, filename):
     logging.info(f"{filename} - Running slicer command on directory: {directory_to_stl}")
+
+    gcode_temp = os.urandom(24).hex()
+    gcode_file = f'{gcode_temp}.gcode'
     
-    command = ['./slicersuper', '--repair', '--export-gcode', '-o', 'output.gcode', directory_to_stl, '--info']
+    command = ['./slicersuper', '--export-gcode', '-o', gcode_file, directory_to_stl, '--info']
     try:
         result = subprocess.run(command, capture_output=True, text=True, timeout=240)
     except subprocess.TimeoutExpired:
@@ -80,6 +101,26 @@ def run_slicer_command_and_extract_info(directory_to_stl, filename):
     response = {
         "status": 200
     }
+    logging.info(f"ERROR: {result.stderr}")
+    if "No extrusions were generated for objects." in result.stderr:
+        logging.info(f"{filename} - No extrusions were generated for objects.")
+        # This might mean that it was too small and might have been created in inches.
+        scale_stl(directory_to_stl, 25.4, directory_to_stl)
+
+        
+
+        command = ['./slicersuper', '--export-gcode', '-o', gcode_file, directory_to_stl, '--info']
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=240)
+        except subprocess.TimeoutExpired:
+            logging.error(f"{filename} - Slicer command timed out.")
+            response = {
+                "status": 400,
+                "error": "Slicer command timed out."
+            }
+            return response
+
+    os.remove(gcode_file)
 
     
     # Extracting information from STDOUT
@@ -109,5 +150,6 @@ def run_slicer_command_and_extract_info(directory_to_stl, filename):
     else:
         logging.error(f"{filename} - Failed to extract slicing information from command output.")
         response['status'] = 400
-        response['error'] = "Failed to extract slicing information from command output."
+        response['error'] = "Failed to extract slicing information from command output. + ERROR: " + result.stderr + " + OUTPUT: " + result.stdout
         return response
+

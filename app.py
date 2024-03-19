@@ -309,10 +309,10 @@ def handle_manual_request(prefix):
     return jsonify({"message": f"Sliced Order Successfully for {order_number}"}), 202
 
 @app.route('/2/api/slice/<prefix>/<cart_id>', methods=['POST'])
-def handle_request(prefix, cart_id):    
+def handle_request_2(prefix, cart_id):    
     try:
         # Start the processing in a separate thread to not block the main thread
-        thread = threading.Thread(target=process_file_v2, args=(prefix, cart_id,))
+        thread = threading.Thread(target=process_files_2, args=(prefix, cart_id,))
         thread.start()
         print(f"Process started for {prefix}")
         return jsonify({"message": f"Process started for {prefix}"}), 202
