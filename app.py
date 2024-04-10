@@ -4,7 +4,6 @@ import threading
 import os
 from dotenv import load_dotenv
 import printslicer as ps
-import _old.imagerender as ir
 import connector as cn
 import logging
 import gc
