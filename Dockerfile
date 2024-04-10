@@ -15,10 +15,10 @@ RUN pip install -r requirements.txt
 
 # copy every content from the local file to the image
 COPY . /app
-RUN rm -rf /app/__pycache__ /app/venv
+RUN rm -rf /app/__pycache__ /app/venv /app/_old
 
 # Assuming that Slic3r is in the /app/Slic3r directory
-RUN chmod -R 777 /app/Slic3r
+# RUN chmod -R 777 /app/Slic3r
 
 RUN chmod +x slicersuper
 

@@ -101,13 +101,17 @@ def run_slicer_command_and_extract_info(directory_to_stl, filename):
     response = {
         "status": 200
     }
-    logging.info(f"ERROR: {result.stderr}")
+    if "Objects could not fit on the bed." in result.stderr:
+        logging.error(f"{filename} - Objects could not fit on the bed.")
+        response = {
+            "status": 400,
+            "error": "Objects could not fit on the bed."
+        }
+        return response
     if "No extrusions were generated for objects." in result.stderr:
         logging.info(f"{filename} - No extrusions were generated for objects.")
         # This might mean that it was too small and might have been created in inches.
         scale_stl(directory_to_stl, 25.4, directory_to_stl)
-
-        
 
         command = ['./slicersuper', '--export-gcode', '-o', gcode_file, directory_to_stl, '--info']
         try:
@@ -120,7 +124,10 @@ def run_slicer_command_and_extract_info(directory_to_stl, filename):
             }
             return response
 
-    os.remove(gcode_file)
+    try:
+        os.remove(gcode_file)
+    except OSError as e:
+        logging.error(f"Error removing file {gcode_file}: {e}")
 
     
     # Extracting information from STDOUT
@@ -150,6 +157,6 @@ def run_slicer_command_and_extract_info(directory_to_stl, filename):
     else:
         logging.error(f"{filename} - Failed to extract slicing information from command output.")
         response['status'] = 400
-        response['error'] = "Failed to extract slicing information from command output. + ERROR: " + result.stderr + " + OUTPUT: " + result.stdout
+        response['error'] = "This file is not sized correctly."
         return response
 

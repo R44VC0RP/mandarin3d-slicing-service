@@ -13,10 +13,12 @@ import requests
 
 from logging.config import dictConfig
 
+version = open("version", "r").read().strip()
+
 dictConfig({
     'version': 1,
     'formatters': {'default': {
-        'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
+        'format': 'V' + version + ' - [%(asctime)s] %(levelname)s in %(module)s: %(message)s',
     }},
     'handlers': {'wsgi': {
         'class': 'logging.StreamHandler',
@@ -227,7 +229,7 @@ def process_file_v2(file, prefix, cart_id):
             cn.update_file_failed(file, response['error'])
             logging.error(f"Failed to slice file {file}. Reason: {response['error']}")
 
-def process_files(prefix):
+def process_files(prefix): # DEPRECATED
     with app.app_context():  # Push an application context
         # Retrieve all files with the given prefix
         files = get_all_files(prefix)
@@ -280,8 +282,8 @@ def process_files_2(prefix, cart_id):
         gc.collect()
         return jsonify({"message": "Sliced Order Successfully"}), 202
 
-@app.route('/api/slice/<prefix>', methods=['POST'])
-def handle_request(prefix):    
+@app.route('/api/slice/<prefix>', methods=['POST']) # DEPRECATED
+def handle_request(prefix):     
     try:
         # Start the processing in a separate thread to not block the main thread
         thread = threading.Thread(target=process_files, args=(prefix,))
@@ -291,7 +293,7 @@ def handle_request(prefix):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/slice/manual/<prefix>', methods=['POST'])
+@app.route('/api/slice/manual/<prefix>', methods=['POST'])# DEPRECATED
 def handle_manual_request(prefix):
     data = request.get_json()
     name = data['name'] 
@@ -318,6 +320,18 @@ def handle_request_2(prefix, cart_id):
         return jsonify({"message": f"Process started for {prefix}"}), 202
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/2/api/slice/manual', methods=['POST'])
+def manual_file_slice():
+    data = request.get_json()
+    name = data['name'] 
+    mass = data['mass']
+    file_id = 'fid_' + os.urandom(16).hex()
+    pricing = caclulate_pricing_tiers(mass)
+
+    cn.update_file_id(mass, pricing, file_id)
+
+    return jsonify({"message": f"Sliced Order Successfully for {file_id}", "file_id": file_id}), 202
 
 
 # run app so it can be run with flask

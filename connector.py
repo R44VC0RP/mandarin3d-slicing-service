@@ -55,6 +55,19 @@ def update_file(filename, mass, pricing):
     else:
         logging.error(f"File {filename} not found.")
 
+def update_file_id(mass, pricing, file_id):
+    """Update an order in MongoDB."""
+    document_found = db.files.find_one({"fileid": file_id})
+
+    if document_found:
+        document_found['pricing'] = pricing
+        document_found['mass'] = mass
+        document_found['status'] = "good"
+        document_found['file_id'] = file_id
+        db.files.update_one({"fileid": file_id}, {"$set": document_found})
+    else:
+        logging.error(f"File {file_id} not found.")
+
 def update_file_failed(filename, message):
     """Update an order in MongoDB."""
     document_found = db.files.find_one({"url": filename})
