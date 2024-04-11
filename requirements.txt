@@ -10,4 +10,3 @@ numpy
 stl
 requests
 gunicorn
-old
