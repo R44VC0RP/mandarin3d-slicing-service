@@ -87,7 +87,7 @@ def run_slicer_command_and_extract_info(directory_to_stl, filename):
     gcode_temp = os.urandom(24).hex()
     gcode_file = f'{gcode_temp}.gcode'
     
-    command = ['./slicersuper', '--export-gcode', '-o', gcode_file, directory_to_stl, '--info']
+    command = ['./slicersuper', '--load', 'config.ini', '--export-gcode', '-o', gcode_file, directory_to_stl, '--info']
     try:
         result = subprocess.run(command, capture_output=True, text=True, timeout=240)
     except subprocess.TimeoutExpired:
