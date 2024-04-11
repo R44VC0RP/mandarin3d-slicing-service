@@ -28,4 +28,4 @@ jobs:
         context: .
         file: ./Dockerfile
         push: true
-        tags: mandarin3d/mandarin3d-release:latest, mandarin3d/mandarin3d-release:${{ github.sha }}
+        tags: mandarin3d/mandarin3d-slicer:latest, mandarin3d/mandarin3d-slicer:${{ github.sha }}
