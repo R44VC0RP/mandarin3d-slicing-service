@@ -31,13 +31,10 @@ dictConfig({
 })
 
 
-
-
 dotenv_path = '.env'  # or specify the full path to the file
 
 # Load the environment variables from your .env file
 load_dotenv(dotenv_path=dotenv_path)
-
 
 
 app = Flask(__name__)
