@@ -43,7 +43,7 @@ def update_order(prefix, filename, mass, pricing):
     else:
         print(f"No matching file found for {filename} in order {prefix}.")
 
-def update_file(filename, mass, pricing):
+def update_file(filename, mass, pricing, response):
     """Update an order in MongoDB."""
     document_found = db.files.find_one({"url": filename})
 
@@ -51,6 +51,9 @@ def update_file(filename, mass, pricing):
         document_found['pricing'] = pricing
         document_found['mass'] = mass
         document_found['status'] = "good"
+        document_found['sizing']['x'] = response['size_x']
+        document_found['sizing']['y'] = response['size_y']
+        document_found['sizing']['z'] = response['size_z']
         db.files.update_one({"url": filename}, {"$set": document_found})
     else:
         logging.error(f"File {filename} not found.")

@@ -194,11 +194,11 @@ def process_file_v2(file, prefix, cart_id):
         # Check if the mass calculation was successful
         if response['status'] == 200:
             os.remove(location)
-            if response['size_x'] > 225 or response['size_y'] > 225 or response['size_z'] > 225:
+            if response['size_x'] > 256 or response['size_y'] > 256 or response['size_z'] > 256:
                 
-                if response['size_x'] > 225:
+                if response['size_x'] > 256:
                     dimension = 'X'
-                elif response['size_y'] > 225:
+                elif response['size_y'] > 256:
                     dimension = 'Y'
                 else:
                     dimension = 'Z'
@@ -210,7 +210,7 @@ def process_file_v2(file, prefix, cart_id):
                 pricing = caclulate_pricing_tiers(mass)
                 # Update the order with the calculated mass and pricing information
                 total_time_end = time.time()
-                cn.update_file(file, mass, pricing)
+                cn.update_file(file, mass, pricing, response)
                 total_processing = total_time_end - entire_file_time_start
                 # logging.info(f"Total processing time for {file} took {total_processing} seconds")
                 mass_processing = slicing_end_time - slicing_start_time
