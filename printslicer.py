@@ -101,7 +101,7 @@ def run_slicer_command_and_extract_info(directory_to_stl, filename):
     response = {
         "status": 200
     }
-    if "Objects could not fit on the bed." in result.stderr:
+    if "Objects could not fit on the bed" in result.stderr:
         logging.error(f"{filename} - Objects could not fit on the bed.")
         response = {
             "status": 400,
