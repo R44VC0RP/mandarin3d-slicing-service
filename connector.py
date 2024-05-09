@@ -52,6 +52,7 @@ def update_file(filename, mass, pricing, response):
         document_found['mass'] = mass
         document_found['status'] = "good"
         document_found['sizing'] = {}
+        # Add the sizing information to the document
         document_found['sizing']['x'] = response['size_x']
         document_found['sizing']['y'] = response['size_y']
         document_found['sizing']['z'] = response['size_z']
