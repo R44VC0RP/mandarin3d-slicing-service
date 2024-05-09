@@ -155,7 +155,9 @@ def run_slicer_command_and_extract_info(directory_to_stl, filename):
         response['size_z'] = slicing_info['size_z']
         return response
     else:
-        logging.error(f"{filename} - Failed to extract slicing information from command output.")
+        logging.error(f"{filename} - Failed to extract slicing information from command output.\nHere is more information:")
+        logging.error(result.stdout)
+        logging.error(result.stderr)
         response['status'] = 400
         response['error'] = "This file is not sized correctly."
         return response
