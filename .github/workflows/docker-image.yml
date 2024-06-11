@@ -29,3 +29,9 @@ jobs:
         file: ./Dockerfile
         push: true
         tags: mandarin3d/mandarin3d-slicer:latest, mandarin3d/mandarin3d-slicer:${{ github.sha }}
+    - name: Send JSON to API endpoint
+      run: |
+        curl -X PUT "https://dockerapi.raavai.com/control/redeploy" \
+        -H "Authorization: Bearer ${{ secrets.BEARER_TOKEN }}" \
+        -H "Content-Type: application/json" \
+        -d '{"dc_name": "mandarin3d-slicer-api", "dc_ip": "192.168.10.120", "dc_port": 5030, "dc_image": "mandarin3d/mandarin3d-slicer-api"}'
