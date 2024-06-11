@@ -92,6 +92,8 @@ def run_slicer_command_and_extract_info(directory_to_stl, filename):
         result = subprocess.run(command, capture_output=True, text=True, timeout=240)
     except subprocess.TimeoutExpired:
         logging.error(f"{filename} - Slicer command timed out.")
+        logging.info(f"Command Output: {result.stdout}")
+        logging.info(f"Command Error: {result.stderr}")
         response = {
             "status": 400,
             "error": "Slicer command timed out."
@@ -103,6 +105,8 @@ def run_slicer_command_and_extract_info(directory_to_stl, filename):
     }
     if "Objects could not fit on the bed" in result.stderr:
         logging.error(f"{filename} - Objects could not fit on the bed.")
+        logging.info(f"Command Output: {result.stdout}")
+        logging.info(f"Command Error: {result.stderr}")
         response = {
             "status": 400,
             "error": "Objects could not fit on the bed."
