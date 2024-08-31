@@ -16,13 +16,16 @@ dev_client = MongoClient(DEV_MONGO_DB_CONNECTION_STRING, server_api=ServerApi('1
 PROD_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d-express:DdC3ShCPB5SRW3Hc@cluster0.gkeabiy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 prod_client = MongoClient(PROD_MONGO_DB_CONNECTION_STRING, server_api=ServerApi('1'))
 
-def download_file(file_url, download_path='tmp'):
+def download_file(file_url, download_path='tmp', filename=None):
     try:
         # Ensure the download path exists
         os.makedirs(download_path, exist_ok=True)
         
         # Extract the file name from the URL
-        file_name = os.path.basename(file_url)
+        if filename is None:
+            file_name = os.path.basename(file_url)
+        else:
+            file_name = filename
         download_path_full = os.path.join(download_path, file_name)
         
         # Download the file
@@ -31,7 +34,7 @@ def download_file(file_url, download_path='tmp'):
             with open(download_path_full, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
-            return download_path
+            return download_path_full
         else:
             logging.error(f"Failed to download file from {file_url}. Status code: {response.status_code}")
             return None
@@ -83,7 +86,7 @@ def process_file_v3(file_object, env):
     # Check if the file is an STL file based on its extension
     if file_object['filename'].lower().endswith('.stl'):
         # Download the STL file to a temporary directory and get its location
-        location = download_file(file_object['utfile_url'])
+        location = download_file(file_object['utfile_url'], "tmp", file_object['filename'])
         # Convert the file location from a relative path to an absolute path
         location = os.path.abspath(location)
         
