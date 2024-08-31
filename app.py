@@ -336,5 +336,5 @@ def manual_file_slice():
 
 # run app so it can be run with flask
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5030)
+    app.run(host='0.0.0.0', port=5030, debug=True)
 

@@ -10,8 +10,10 @@ import logging
 import requests
 
 api_v2_blueprint = Blueprint('api_v2', __name__)
-DEV_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d-express:DdC3ShCPB5SRW3Hc@cluster0.gkeabiy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-PROD_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d-express:DdC3ShCPB5SRW3Hc@cluster0.gkeabiy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+DEV_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d_config:DscClTJosRBiB3St@cluster0.gkeabiy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+dev_client = MongoClient(DEV_MONGO_DB_CONNECTION_STRING, server_api=ServerApi('1'))
+PROD_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d_config:DscClTJosRBiB3St@cluster0.gkeabiy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+prod_client = MongoClient(PROD_MONGO_DB_CONNECTION_STRING, server_api=ServerApi('1'))
 
 def download_file(file_url, download_path='tmp'):
     try:
@@ -38,32 +40,35 @@ def download_file(file_url, download_path='tmp'):
 
 def get_file_from_db(fileid, env):
     if env == "dev":
-        client = MongoClient(DEV_MONGO_DB_CONNECTION_STRING, server_api=ServerApi('1'))
-        db = client.m3d_express_dev
+        client = dev_client
+        db = client['m3d-express-dev']
     else:
-        client = MongoClient(PROD_MONGO_DB_CONNECTION_STRING, server_api=ServerApi('1'))
-        db = client.m3d_express_prod
+        client = prod_client
+        db = client['m3d-express-prod']
     
     file_object = db.files.find_one({"fileid": fileid})
+    logging.info(f"File object: {file_object}")
     return file_object
+
+
 
 def get_configs_from_db(env):
     if env == "dev":
-        client = MongoClient(DEV_MONGO_DB_CONNECTION_STRING, server_api=ServerApi('1'))
-        db = client.m3d_express_dev
+        client = dev_client
+        db = client['m3d-express-dev']
     else:
-        client = MongoClient(PROD_MONGO_DB_CONNECTION_STRING, server_api=ServerApi('1'))
-        db = client.m3d_express_prod
+        client = prod_client
+        db = client['m3d-express-prod']
     configs = db.configs.find_one({})
     return configs
 
 def update_file_status(fileid, env, status, error=None, mass=None, dimensions=None):
     if env == "dev":
-        client = MongoClient(DEV_MONGO_DB_CONNECTION_STRING, server_api=ServerApi('1'))
-        db = client.m3d_express_dev
+        client = dev_client
+        db = client['m3d-express-dev']
     else:
-        client = MongoClient(PROD_MONGO_DB_CONNECTION_STRING, server_api=ServerApi('1'))
-        db = client.m3d_express_prod
+        client = prod_client
+        db = client['m3d-express-prod']
     if error is None:
         db.files.update_one({"fileid": fileid}, {"$set": {"file_status": status, "mass_in_grams": mass, "dimensions": dimensions}})
     else:
@@ -77,7 +82,7 @@ def process_file_v3(file_object):
     # Check if the file is an STL file based on its extension
     if file_object['filename'].lower().endswith('.stl'):
         # Download the STL file to a temporary directory and get its location
-        location = download_file(file_object['url'])
+        location = download_file(file_object['utfile_url'])
         # Convert the file location from a relative path to an absolute path
         location = os.path.abspath(location)
         
@@ -145,8 +150,15 @@ def handle_request_v2():
     fileid = request.json['fileid']
     env = request.json['env']
     # Get the file object from the database
+    logging.info(f"Processing file {fileid} in {env}")
     file_object = get_file_from_db(fileid, env)
     process_file_v3(file_object)
     # Your v2 logic here
     pass
+
+@api_v2_blueprint.route('/api/db', methods=['POST'])
+def handle_request_db():
+    env = request.json['env']
+    test_db_connection(env)
+    return jsonify({"status": "success"})
 
