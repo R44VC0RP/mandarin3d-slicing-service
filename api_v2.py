@@ -10,8 +10,8 @@ import logging
 import requests
 
 api_v2_blueprint = Blueprint('api_v2', __name__)
-DEV_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d-express:DdC3ShCPB5SRW3Hc@cluster0.gkeabiy.mongodb.net/m3d-express-dev"
-PROD_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d-express:DdC3ShCPB5SRW3Hc@cluster0.gkeabiy.mongodb.net/m3d-express-prod"
+DEV_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d-express:DdC3ShCPB5SRW3Hc@cluster0.gkeabiy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+PROD_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d-express:DdC3ShCPB5SRW3Hc@cluster0.gkeabiy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 
 def download_file(file_url, download_path='tmp'):
     try:
