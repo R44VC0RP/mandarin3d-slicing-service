@@ -8,11 +8,12 @@ from pymongo.server_api import ServerApi
 import os
 import logging
 import requests
+import threading
 
 api_v2_blueprint = Blueprint('api_v2', __name__)
-DEV_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d_config:DscClTJosRBiB3St@cluster0.gkeabiy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+DEV_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d-express:DdC3ShCPB5SRW3Hc@cluster0.gkeabiy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 dev_client = MongoClient(DEV_MONGO_DB_CONNECTION_STRING, server_api=ServerApi('1'))
-PROD_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d_config:DscClTJosRBiB3St@cluster0.gkeabiy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+PROD_MONGO_DB_CONNECTION_STRING = "mongodb+srv://m3d-express:DdC3ShCPB5SRW3Hc@cluster0.gkeabiy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 prod_client = MongoClient(PROD_MONGO_DB_CONNECTION_STRING, server_api=ServerApi('1'))
 
 def download_file(file_url, download_path='tmp'):
@@ -74,7 +75,7 @@ def update_file_status(fileid, env, status, error=None, mass=None, dimensions=No
     else:
         db.files.update_one({"fileid": fileid}, {"$set": {"file_status": status, "file_error": error}})
 
-def process_file_v3(file_object):
+def process_file_v3(file_object, env):
     logging.info("STARTING FILE - " + file_object['filename'] + " - " + file_object['fileid'])
     entire_file_time_start = time.time()
     logging.info(f"Processing file {file_object['filename']}")
@@ -104,7 +105,7 @@ def process_file_v3(file_object):
         # Check if the mass calculation was successful
         if response['status'] == 200:
             os.remove(location)
-            configs = get_configs_from_db(file_object['env'])
+            configs = get_configs_from_db(env)
             if response['size_x'] > configs['dimensionConfig']['x'] or response['size_y'] > configs['dimensionConfig']['y'] or response['size_z'] > configs['dimensionConfig']['z']:
                 if response['size_x'] > configs['dimensionConfig']['x']:
                     dimension = 'X'
@@ -137,11 +138,11 @@ def process_file_v3(file_object):
                     "z": response['size_z']
                 }
                 logging.info(f"Stats: {stats}")
-                update_file_status(file_object['fileid'], file_object['env'], "success", dimensions=dims)
+                update_file_status(file_object['fileid'], env, "success", dimensions=dims)
         else:
             # If the mass calculation failed, update the order status accordingly
             logging.error(f"Failed to slice file {file_object['filename']}. Reason: {response['error']}")
-            update_file_status(file_object['fileid'], file_object['env'], "error", f"Failed to slice file. Reason: {response['error']}")
+            update_file_status(file_object['fileid'], env, "error", f"Failed to slice file. Reason: {response['error']}")
 
 
 @api_v2_blueprint.route('/api/slice', methods=['POST'])
@@ -149,16 +150,11 @@ def handle_request_v2():
     # Get the file object from the database
     fileid = request.json['fileid']
     env = request.json['env']
-    # Get the file object from the database
     logging.info(f"Processing file {fileid} in {env}")
     file_object = get_file_from_db(fileid, env)
-    process_file_v3(file_object)
-    # Your v2 logic here
-    pass
-
-@api_v2_blueprint.route('/api/db', methods=['POST'])
-def handle_request_db():
-    env = request.json['env']
-    test_db_connection(env)
-    return jsonify({"status": "success"})
-
+    
+    # Start processing in a separate thread
+    thread = threading.Thread(target=process_file_v3, args=(file_object, env))
+    thread.start()
+    
+    return jsonify({"message": "Processing started successfully."}), 202
