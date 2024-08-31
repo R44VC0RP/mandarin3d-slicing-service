@@ -141,7 +141,7 @@ def process_file_v3(file_object, env):
                     "z": response['size_z']
                 }
                 logging.info(f"Stats: {stats}")
-                update_file_status(file_object['fileid'], env, "success", dimensions=dims)
+                update_file_status(file_object['fileid'], env, "success", dimensions=dims, mass=mass)
         else:
             # If the mass calculation failed, update the order status accordingly
             logging.error(f"Failed to slice file {file_object['filename']}. Reason: {response['error']}")
