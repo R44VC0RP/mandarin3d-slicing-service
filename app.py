@@ -9,6 +9,7 @@ import logging
 import gc
 import time
 import requests
+from api_v2 import api_v2_blueprint  # Add this import
 
 from logging.config import dictConfig
 
@@ -38,6 +39,9 @@ load_dotenv(dotenv_path=dotenv_path)
 
 
 app = Flask(__name__)
+
+# Add the v2 blueprint
+app.register_blueprint(api_v2_blueprint, url_prefix='/v2')
 
 tmp_directory = 'tmp'
 # check if the tmp directory exists
