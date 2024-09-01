@@ -124,7 +124,7 @@ def process_file_v3(file_object, env):
                     update_file_status(file_object['fileid'], file_object['env'], "error", f"Dimension {dimension} too large. {dimension} is {response['size_z']}mm.")
             else:
                 # Calculate pricing tiers based on the mass of the STL file
-                mass = response['mass']
+                mass = round(response['mass'], 2)
                 # Update the order with the calculated mass and pricing information
                 total_time_end = time.time()
                 total_processing = total_time_end - entire_file_time_start
@@ -136,9 +136,9 @@ def process_file_v3(file_object, env):
                     "mass_processing": mass_processing
                 }
                 dims = {
-                    "x": response['size_x'],
-                    "y": response['size_y'],
-                    "z": response['size_z']
+                    "x": int(response['size_x']),
+                    "y": int(response['size_y']),
+                    "z": int(response['size_z'])
                 }
                 logging.info(f"Stats: {stats}")
                 update_file_status(file_object['fileid'], env, "success", dimensions=dims, mass=mass)
