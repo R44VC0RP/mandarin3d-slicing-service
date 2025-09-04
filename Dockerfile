@@ -12,14 +12,12 @@ RUN apt-get update && apt-get install -y \
     gcc \
     build-essential \
     bash \
-    libgl1-mesa-glx \
-    libgtk-3-0 \
+    libgl1-mesa-dev \
     libglib2.0-0 \
     libxext6 \
     libxrender1 \
     libgomp1 \
     libglu1-mesa \
-    libegl1-mesa \
     libxrandr2 \
     libxss1 \
     libxcursor1 \
@@ -27,6 +25,9 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     libxi6 \
     libxtst6 \
+    libharfbuzz0b \
+    libfontconfig1 \
+    libfreetype6 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -42,5 +43,7 @@ RUN rm -rf /app/__pycache__ /app/venv /app/_old
 RUN chmod +x slicersuper
 
 # configure the container to run in an executed manner
+ENV PORT=80
+EXPOSE 80
 
-CMD gunicorn --bind 0.0.0.0:$PORT app:app
+CMD gunicorn --bind 0.0.0.0:${PORT} app:app
