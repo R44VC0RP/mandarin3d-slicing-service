@@ -6,16 +6,16 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "5030:5030"
+      - "80:80"
     environment:
-      - PORT=5030
+      - PORT=80
       - FLASK_ENV=production
     volumes:
       - ./tmp:/app/tmp
       - ./logs:/app/logs
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5030/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
       interval: 30s
       timeout: 10s
       retries: 3

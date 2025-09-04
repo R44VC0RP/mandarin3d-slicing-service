@@ -7,7 +7,7 @@
 IMAGE_NAME := mandarin3d/mandarin3d-slicer
 CONTAINER_NAME := mandarin3d-slicer
 VERSION := $(shell cat version)
-PORT := 5030
+PORT := 80
 
 # Default target
 help: ## Show this help message

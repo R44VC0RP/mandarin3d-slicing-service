@@ -16,8 +16,8 @@
     "formats": "make formats",
     
     "docker:build": "docker build -t mandarin3d/mandarin3d-slicer:latest .",
-    "docker:run": "docker run -d --name mandarin3d-slicer -p 5030:5030 mandarin3d/mandarin3d-slicer:latest",
-    "docker:run-dev": "docker run -it --rm --name mandarin3d-slicer-dev -p 5030:5030 -v $(pwd):/app mandarin3d/mandarin3d-slicer:latest",
+    "docker:run": "docker run -d --name mandarin3d-slicer -p 80:80 mandarin3d/mandarin3d-slicer:latest",
+    "docker:run-dev": "docker run -it --rm --name mandarin3d-slicer-dev -p 80:80 -v $(pwd):/app mandarin3d/mandarin3d-slicer:latest",
     "docker:stop": "docker stop mandarin3d-slicer && docker rm mandarin3d-slicer",
     "docker:logs": "docker logs -f mandarin3d-slicer",
     "docker:shell": "docker exec -it mandarin3d-slicer /bin/bash",
@@ -29,10 +29,10 @@
     "compose:logs": "docker-compose logs -f",
     "compose:prod": "docker-compose --profile production up -d",
     
-    "test:health": "curl -f http://localhost:5030/health",
-    "test:formats": "curl -s http://localhost:5030/api/formats | jq .",
-    "test:upload": "curl -X POST http://localhost:5030/api/slice -F 'model_file=@test.stl' -F 'callback_url=http://httpbin.org/post' -F 'file_id=test_$(date +%s)'",
-    "test:url": "curl -X POST http://localhost:5030/api/slice -H 'Content-Type: application/json' -d '{\"file_url\":\"https://example.com/model.stl\",\"callback_url\":\"http://httpbin.org/post\",\"file_id\":\"url_test\"}'",
+    "test:health": "curl -f http://localhost:80/health",
+    "test:formats": "curl -s http://localhost:80/api/formats | jq .",
+    "test:upload": "curl -X POST http://localhost:80/api/slice -F 'model_file=@test.stl' -F 'callback_url=http://httpbin.org/post' -F 'file_id=test_$(date +%s)'",
+    "test:url": "curl -X POST http://localhost:80/api/slice -H 'Content-Type: application/json' -d '{\"file_url\":\"https://example.com/model.stl\",\"callback_url\":\"http://httpbin.org/post\",\"file_id\":\"url_test\"}'",
     
     "install:deps": "pip install -r requirements.txt",
     "install:dev": "pip install -r requirements.txt flake8 black pytest",
@@ -91,14 +91,14 @@
   },
   "optionalDependencies": {},
   "config": {
-    "port": "5030",
+    "port": "80",
     "image_name": "mandarin3d/mandarin3d-slicer",
     "container_name": "mandarin3d-slicer"
   },
   "docker": {
     "image": "mandarin3d/mandarin3d-slicer",
     "ports": {
-      "5030": "5030"
+      "80": "80"
     },
     "volumes": {
       "./tmp": "/app/tmp",
@@ -106,7 +106,7 @@
     }
   },
   "healthcheck": {
-    "url": "http://localhost:5030/health",
+    "url": "http://localhost:80/health",
     "interval": "30s",
     "timeout": "10s",
     "retries": 3
