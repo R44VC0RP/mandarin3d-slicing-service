@@ -320,6 +320,7 @@ def slice_3d_file():
         "file_url": "https://example.com/model.obj",
         "callback_url": "https://your-api.com/callback",
         "file_id": "optional_file_identifier",
+        "file_name": "model.stl",  // optional: use when URL lacks filename/extension
         "max_dimensions": {"x": 300, "y": 300, "z": 300}  // optional
     }
     
@@ -336,15 +337,23 @@ def slice_3d_file():
             file_url = data.get('file_url') or data.get('stl_url')  # Support old parameter name
             callback_url = data.get('callback_url')
             file_id = data.get('file_id')
+            provided_file_name = data.get('file_name')  # Optional filename when URL lacks it
             max_dimensions = data.get('max_dimensions', {'x': 300, 'y': 300, 'z': 300})
             
             if not file_url or not callback_url:
                 return jsonify({"error": "file_url and callback_url are required"}), 400
             
-            # Extract original filename and extension from URL
-            original_filename = os.path.basename(file_url.split('?')[0])  # Remove query params
-            if not original_filename:
-                original_filename = f"download_{int(time.time())}.unknown"
+            # Determine filename for validation and storage
+            if provided_file_name:
+                # Use provided filename (for URLs without filename/extension)
+                original_filename = provided_file_name
+            else:
+                # Extract original filename and extension from URL
+                original_filename = os.path.basename(file_url.split('?')[0])  # Remove query params
+                if not original_filename or '.' not in original_filename:
+                    return jsonify({
+                        "error": "URL does not contain a filename with extension. Please provide a 'file_name' parameter with the correct filename and extension."
+                    }), 400
             
             # Check if format is supported
             if not is_supported_format(original_filename):

@@ -10,6 +10,8 @@ A Flask-based microservice for processing various 3D file formats and extracting
 
 *Conversion engines: trimesh (primary), pymeshlab (fallback)*
 
+Baseurl: https://m3d-api.sevalla.app
+
 ## API Endpoints
 
 ### POST `/api/slice`
