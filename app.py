@@ -1,15 +1,14 @@
 from flask import Flask, request, jsonify
-from filemanagement import get_all_files, download_file, put_file, upload_single_file
 import threading
 import os
 from dotenv import load_dotenv
 import printslicer as ps
-import connector as cn
 import logging
 import gc
 import time
 import requests
-from api_v2 import api_v2_blueprint  # Add this import
+import tempfile
+from werkzeug.utils import secure_filename
 
 from logging.config import dictConfig
 
@@ -32,16 +31,11 @@ dictConfig({
 })
 
 
-dotenv_path = '.env'  # or specify the full path to the file
-
-# Load the environment variables from your .env file
-load_dotenv(dotenv_path=dotenv_path)
+# Load environment variables if .env file exists
+load_dotenv()
 
 
 app = Flask(__name__)
-
-# Add the v2 blueprint
-app.register_blueprint(api_v2_blueprint, url_prefix='/v2')
 
 tmp_directory = 'tmp'
 # check if the tmp directory exists
@@ -50,288 +44,240 @@ if not os.path.exists(tmp_directory):
 
 
 
-def caclulate_pricing_tiers(mass):
-    profit_margin = float(cn.get_profit_margin())
-    mass = float(mass)
-    spool_price = cn.get_price_per_spool()
-    price_per_gram = float(spool_price) / 1000
-    good_price = round(mass * price_per_gram * 1.1 * profit_margin + 0.20, 2)
-    better_price = round(mass * price_per_gram * 1.2 * profit_margin + 0.20, 2)
-    best_price = round(mass * price_per_gram * 1.4 * profit_margin + 0.20, 2)
+def download_file_from_url(url, download_path='tmp', filename=None):
+    """Download a file from URL to local temp directory"""
+    try:
+        os.makedirs(download_path, exist_ok=True)
+        
+        if filename is None:
+            filename = os.path.basename(url)
+        
+        if not filename.endswith('.stl'):
+            filename = f"{filename}.stl"
+            
+        download_path_full = os.path.join(download_path, filename)
+        
+        response = requests.get(url, stream=True)
+        if response.status_code == 200:
+            with open(download_path_full, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            return download_path_full
+        else:
+            logging.error(f"Failed to download file from {url}. Status code: {response.status_code}")
+            return None
+    except Exception as e:
+        logging.error(f"An error occurred while downloading the file: {e}")
+        return None
 
-    return {
-        "good_price": good_price,
-        "better_price": better_price,
-        "best_price": best_price
+def send_callback(callback_url, result_data):
+    """Send results to callback URL"""
+    try:
+        response = requests.post(callback_url, json=result_data, timeout=30)
+        if response.status_code == 200:
+            logging.info(f"Successfully sent callback to {callback_url}")
+            return True
+        else:
+            logging.error(f"Callback failed with status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        logging.error(f"Failed to send callback to {callback_url}: {str(e)}")
+        return False
+
+def process_stl_file(file_path, callback_url, file_id=None, max_dimensions=None):
+    """Process STL file and send results to callback URL"""
+    start_time = time.time()
+    
+    # Set default max dimensions if not provided
+    if max_dimensions is None:
+        max_dimensions = {'x': 300, 'y': 300, 'z': 300}
+    
+    try:
+        logging.info(f"Starting STL processing for file: {file_path}")
+        
+        # Get absolute path
+        absolute_path = os.path.abspath(file_path)
+        
+        # Run slicer to get mass and dimensions
+        slicer_start_time = time.time()
+        response = ps.run_slicer_command_and_extract_info(absolute_path, os.path.basename(file_path))
+        slicer_end_time = time.time()
+        
+        processing_time = slicer_end_time - start_time
+        slicer_time = slicer_end_time - slicer_start_time
+        
+        # Clean up temporary file
+        try:
+            os.remove(absolute_path)
+            logging.info(f"Cleaned up temporary file: {absolute_path}")
+        except Exception as e:
+            logging.warning(f"Failed to clean up temp file {absolute_path}: {e}")
+        
+        # Prepare result data
+        result_data = {
+            "file_id": file_id,
+            "processing_time": processing_time,
+            "slicer_time": slicer_time,
+            "timestamp": time.time()
+        }
+        
+        if response['status'] == 200:
+            # Check dimensions
+            if (response['size_x'] > max_dimensions['x'] or 
+                response['size_y'] > max_dimensions['y'] or 
+                response['size_z'] > max_dimensions['z']):
+                
+                # Find which dimension is too large
+                dimension = 'X' if response['size_x'] > max_dimensions['x'] else \
+                           'Y' if response['size_y'] > max_dimensions['y'] else 'Z'
+                
+                result_data.update({
+                    "status": "error",
+                    "error": f"Dimension {dimension} too large. Model dimensions: {response['size_x']:.2f}x{response['size_y']:.2f}x{response['size_z']:.2f}mm. Max allowed: {max_dimensions['x']}x{max_dimensions['y']}x{max_dimensions['z']}mm.",
+                    "dimensions": {
+                        "x": response['size_x'],
+                        "y": response['size_y'], 
+                        "z": response['size_z']
+                    }
+                })
+            else:
+                result_data.update({
+                    "status": "success",
+                    "mass_grams": response['mass'],
+                    "dimensions": {
+                        "x": response['size_x'],
+                        "y": response['size_y'],
+                        "z": response['size_z']
+                    }
+                })
+        else:
+            result_data.update({
+                "status": "error",
+                "error": response.get('error', 'Unknown slicing error')
+            })
+        
+        # Send callback
+        callback_success = send_callback(callback_url, result_data)
+        
+        logging.info(f"STL processing completed. Status: {result_data['status']}, Callback sent: {callback_success}")
+        return result_data
+        
+    except Exception as e:
+        logging.error(f"Error processing STL file {file_path}: {str(e)}")
+        error_data = {
+            "file_id": file_id,
+            "status": "error", 
+            "error": f"Processing error: {str(e)}",
+            "processing_time": time.time() - start_time,
+            "timestamp": time.time()
+        }
+        send_callback(callback_url, error_data)
+        return error_data
+
+
+@app.route('/api/slice', methods=['POST'])
+def slice_stl():
+    """
+    Process STL file and return results via callback
+    
+    Request body can be:
+    1. JSON with STL URL:
+    {
+        "stl_url": "https://example.com/model.stl",
+        "callback_url": "https://your-api.com/callback",
+        "file_id": "optional_file_identifier",
+        "max_dimensions": {"x": 300, "y": 300, "z": 300}  // optional
     }
-
-def api_hit_when_all_files_sliced(prefix):
-    # This function will be called when all files are sliced, also I do not want to actively update if we are working on development or production. So first send request to developement, and if that fails, send request to production
-    # development api url: https://dev.mandarin3d.com/api/slice/complete/<prefix>
-    # production api url: https://mandarin3d.com/api/slice/complete/<prefix>
-    try:
-        response = requests.post(f"https://dev.mandarin3d.com/api/slice/complete/{prefix}")
-        
-        if response.status_code == 200:
-            return "Request sent to development"
-        else:
-            response = requests.post(f"https://mandarin3d.com/api/slice/complete/{prefix}")
-            if response.status_code == 200:
-                return "Request sent to production"
-            else:
-                return "Failed to send request to production and development. Reason: Unknown"
-    except Exception as e:
-        return f"Failed to send request to development. Reason: {str(e)}" 
-
-def api_hit_when_all_files_sliced_2(prefix, cart_id):
-    # This function will be called when all files are sliced, also I do not want to actively update if we are working on development or production. So first send request to developement, and if that fails, send request to production
-    # development api url: https://dev.mandarin3d.com/api/slice/complete/<prefix>
-    # production api url: https://mandarin3d.com/api/slice/complete/<prefix>
-    try:
-        response = requests.post(f"https://dev.mandarin3d.com/api/2/slice/complete/{prefix}/{cart_id}")
-        
-        if response.status_code == 200:
-            return "Request sent to development"
-        else:
-            response = requests.post(f"https://mandarin3d.com/api/2/slice/complete/{prefix}/{cart_id}")
-            if response.status_code == 200:
-                return "Request sent to production"
-            else:
-                return "Failed to send request to production and development. Reason: Unknown"
-    except Exception as e:
-        return f"Failed to send request to development. Reason: {str(e)}"
-
-def process_file(file, prefix):
-    logging.info("STARTING FILE - " + file)
-    entire_file_time_start = time.time()
-    print(f"Processing file {file}")
-    logging.info(f"Processing file {file}")
     
-    # Check if the file is an STL file based on its extension
-    if file.lower().endswith('.stl'):
-        # Download the STL file to a temporary directory and get its location
-        location = download_file(file, prefix, tmp_directory)
-        # Convert the file location from a relative path to an absolute path
-        location = os.path.abspath(location)
-        
-        # Get the mass of the STL file by processing it
-        slicing_start_time = time.time()
-        start_time_get_mass = time.time()
-        # response = ps.get_mass(location)
-        # Phasing out the old memory intensive method for the less memory intensive method. 
-        # end_time_get_mass = time.time()
-        # logging.info(f"TIME Time taken for get_mass: {end_time_get_mass - start_time_get_mass} seconds")
-
-        start_time_run_slicer = time.time()
-        response = ps.run_slicer_command_and_extract_info(location, file)
-        end_time_run_slicer = time.time()
-        logging.info(f"TIME Time taken for run_slicer_command_and_extract_info: {end_time_run_slicer - start_time_run_slicer} seconds") 
-        slicing_end_time = time.time()
-        logging.info(f"FIND Mass response: {response}")
-        
-        # Check if the mass calculation was successful
-        if response['status'] == 200:
-            os.remove(location)
-            if response['size_x'] > 225 or response['size_y'] > 225 or response['size_z'] > 225:
-                
-                if response['size_x'] > 225:
-                    dimension = 'X'
-                elif response['size_y'] > 225:
-                    dimension = 'Y'
-                else:
-                    dimension = 'Z'
-                cn.update_order_failed_slice(prefix, file, f"Dimension {dimension} too large, Model is {float(response['size_x']):.2f}x{float(response['size_y']):.2f}x{float(response['size_z']):.2f}.")
-                logging.error(f"Failed to slice file {file}. Reason: Dimension {dimension} too large.")
-            else:
-                # Calculate pricing tiers based on the mass of the STL file
-                mass = response['mass']
-                pricing = caclulate_pricing_tiers(mass)
-                # Update the order with the calculated mass and pricing information
-                total_time_end = time.time()
-                cn.update_order(prefix, file, mass, pricing)
-                total_processing = total_time_end - entire_file_time_start
-                # logging.info(f"Total processing time for {file} took {total_processing} seconds")
-                mass_processing = slicing_end_time - slicing_start_time
-                # logging.info(f"Mass processing time for {file} took {mass_processing} seconds")
-                stats = {
-                    "total_processing": total_processing,
-                    "mass_processing": mass_processing
+    2. Form-data with STL file upload:
+    - stl_file: STL file
+    - callback_url: callback URL
+    - file_id: optional file identifier 
+    - max_x, max_y, max_z: optional dimension limits
+    """
+    try:
+        # Check if it's JSON request (URL) or form-data (file upload)
+        if request.is_json:
+            data = request.get_json()
+            stl_url = data.get('stl_url')
+            callback_url = data.get('callback_url')
+            file_id = data.get('file_id')
+            max_dimensions = data.get('max_dimensions', {'x': 300, 'y': 300, 'z': 300})
+            
+            if not stl_url or not callback_url:
+                return jsonify({"error": "stl_url and callback_url are required"}), 400
+            
+            # Download file from URL
+            filename = f"{file_id or 'temp'}_{int(time.time())}.stl"
+            file_path = download_file_from_url(stl_url, tmp_directory, filename)
+            
+            if not file_path:
+                error_data = {
+                    "file_id": file_id,
+                    "status": "error",
+                    "error": "Failed to download STL file from URL",
+                    "timestamp": time.time()
                 }
-                cn.upload_stats(prefix, file, stats)
-                # print(f"Finished processing file {file}")
-                # print(f"Total processing time for {file} took {total_processing} seconds")
-                # print(f"Mass processing time for {file} took {mass_processing} seconds")                
-        else:
-            # If the mass calculation failed, update the order status accordingly
-            cn.update_order_failed_slice(prefix, file, response['error'])
-            logging.error(f"Failed to slice file {file}. Reason: {response['error']}")
-
-
-def process_file_v2(file, prefix, cart_id):
-    logging.info("STARTING FILE - " + file)
-    entire_file_time_start = time.time()
-    print(f"Processing file {file}")
-    logging.info(f"Processing file {file}")
-    
-    # Check if the file is an STL file based on its extension
-    if file.lower().endswith('.stl'):
-        # Download the STL file to a temporary directory and get its location
-        location = download_file(file, prefix, tmp_directory)
-        # Convert the file location from a relative path to an absolute path
-        location = os.path.abspath(location)
-        
-        # Get the mass of the STL file by processing it
-        slicing_start_time = time.time()
-
-        # response = ps.get_mass(location)
-        # Phasing out the old memory intensive method for the less memory intensive method. 
-        # end_time_get_mass = time.time()
-        # logging.info(f"TIME Time taken for get_mass: {end_time_get_mass - start_time_get_mass} seconds")
-
-        start_time_run_slicer = time.time()
-        response = ps.run_slicer_command_and_extract_info(location, file)
-        end_time_run_slicer = time.time()
-        logging.info(f"TIME Time taken for run_slicer_command_and_extract_info: {end_time_run_slicer - start_time_run_slicer} seconds") 
-        slicing_end_time = time.time()
-        logging.info(f"FIND Mass response: {response}")
-        
-        # Check if the mass calculation was successful
-        if response['status'] == 200:
-            os.remove(location)
-            if response['size_x'] > 256 or response['size_y'] > 256 or response['size_z'] > 256:
+                send_callback(callback_url, error_data)
+                return jsonify({"error": "Failed to download STL file"}), 400
                 
-                if response['size_x'] > 256:
-                    dimension = 'X'
-                elif response['size_y'] > 256:
-                    dimension = 'Y'
-                else:
-                    dimension = 'Z'
-                cn.update_file_failed(file, f"Dimension {dimension} too large, Model is {float(response['size_x']):.2f}x{float(response['size_y']):.2f}x{float(response['size_z']):.2f}.")
-                logging.error(f"Failed to slice file {file}. Reason: Dimension {dimension} too large.")
-            else:
-                # Calculate pricing tiers based on the mass of the STL file
-                mass = response['mass']
-                pricing = caclulate_pricing_tiers(mass)
-                # Update the order with the calculated mass and pricing information
-                total_time_end = time.time()
-                cn.update_file(file, mass, pricing, response)
-                total_processing = total_time_end - entire_file_time_start
-                # logging.info(f"Total processing time for {file} took {total_processing} seconds")
-                mass_processing = slicing_end_time - slicing_start_time
-                # logging.info(f"Mass processing time for {file} took {mass_processing} seconds")
-                stats = {
-                    "total_processing": total_processing,
-                    "mass_processing": mass_processing
-                }
-                cn.upload_stats(prefix, file, stats)
         else:
-            # If the mass calculation failed, update the order status accordingly
-            cn.update_file_failed(file, response['error'])
-            logging.error(f"Failed to slice file {file}. Reason: {response['error']}")
-
-def process_files(prefix): # DEPRECATED
-    with app.app_context():  # Push an application context
-        # Retrieve all files with the given prefix
-        files = get_all_files(prefix)
-        print(f"Files found: {files}")
-        logging.info(f"Files found: {files}")
+            # Handle file upload
+            if 'stl_file' not in request.files:
+                return jsonify({"error": "No STL file provided"}), 400
+            
+            file = request.files['stl_file']
+            callback_url = request.form.get('callback_url')
+            file_id = request.form.get('file_id')
+            
+            if not callback_url:
+                return jsonify({"error": "callback_url is required"}), 400
+            
+            if file.filename == '':
+                return jsonify({"error": "No file selected"}), 400
+            
+            if not file.filename.lower().endswith('.stl'):
+                return jsonify({"error": "File must be an STL file"}), 400
+            
+            # Save uploaded file
+            filename = secure_filename(f"{file_id or 'upload'}_{int(time.time())}_{file.filename}")
+            file_path = os.path.join(tmp_directory, filename)
+            file.save(file_path)
+            
+            # Get max dimensions from form data
+            max_dimensions = {
+                'x': float(request.form.get('max_x', 300)),
+                'y': float(request.form.get('max_y', 300)),
+                'z': float(request.form.get('max_z', 300))
+            }
         
-        threads = []
-        # Create a thread for each file found and start them
-        for file in files:
-            thread = threading.Thread(target=process_file, args=(file, prefix))
-            threads.append(thread)
-            thread.start()
-
-        # Wait for all threads to complete
-        for thread in threads:
-            thread.join()
-
-        logging.info(f"Finished processing files for {prefix}")
-        print(f"Finished processing files for {prefix}")
-        response = api_hit_when_all_files_sliced(prefix)
-        print(response)
-        logging.info(response)
-        gc.collect()
-        return jsonify({"message": "Sliced Order Successfully"}), 202
-    
-
-def process_files_2(prefix, cart_id):
-    with app.app_context():  # Push an application context
-        # Retrieve all files with the given prefix
-        files = get_all_files(prefix)
-        print(f"Files found: {files}")
-        logging.info(f"Files found: {files}")
+        # Start processing in background thread
+        def process_async():
+            with app.app_context():
+                process_stl_file(file_path, callback_url, file_id, max_dimensions)
+                gc.collect()
         
-        threads = []
-        # Create a thread for each file found and start them
-        for file in files:
-            thread = threading.Thread(target=process_file_v2, args=(file, prefix, cart_id))
-            threads.append(thread)
-            thread.start()
-
-        # Wait for all threads to complete
-        for thread in threads:
-            thread.join()
-
-        logging.info(f"Finished processing files for {prefix}")
-        print(f"Finished processing files for {prefix}")
-        response = api_hit_when_all_files_sliced_2(prefix, cart_id)
-        print(response)
-        logging.info(response)
-        gc.collect()
-        return jsonify({"message": "Sliced Order Successfully"}), 202
-
-@app.route('/api/slice/<prefix>', methods=['POST']) # DEPRECATED
-def handle_request(prefix):     
-    try:
-        # Start the processing in a separate thread to not block the main thread
-        thread = threading.Thread(target=process_files, args=(prefix,))
+        thread = threading.Thread(target=process_async)
         thread.start()
-        print(f"Process started for {prefix}")
-        return jsonify({"message": f"Process started for {prefix}"}), 202
+        
+        return jsonify({
+            "message": "STL processing started", 
+            "file_id": file_id,
+            "status": "processing"
+        }), 202
+        
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"Error in slice_stl endpoint: {str(e)}")
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
-@app.route('/api/slice/manual/<prefix>', methods=['POST'])# DEPRECATED
-def handle_manual_request(prefix):
-    data = request.get_json()
-    name = data['name'] 
-    mass = data['mass']
-    order_number = data['order_number']
-
-    pricing = caclulate_pricing_tiers(mass)
-
-    png = "https://s2.mandarin3d.com/manual-m.png"
-
-    filename = prefix + "/" + name
-
-    cn.update_order(prefix, filename, mass, pricing)
-
-    return jsonify({"message": f"Sliced Order Successfully for {order_number}"}), 202
-
-@app.route('/2/api/slice/<prefix>/<cart_id>', methods=['POST'])
-def handle_request_2(prefix, cart_id):    
-    try:
-        # Start the processing in a separate thread to not block the main thread
-        thread = threading.Thread(target=process_files_2, args=(prefix, cart_id,))
-        thread.start()
-        print(f"Process started for {prefix}")
-        return jsonify({"message": f"Process started for {prefix}"}), 202
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/2/api/slice/manual', methods=['POST'])
-def manual_file_slice():
-    data = request.get_json()
-    name = data['name'] 
-    mass = data['mass']
-    file_id = 'fid_' + os.urandom(16).hex()
-    pricing = caclulate_pricing_tiers(mass)
-
-    cn.update_file_id(mass, pricing, file_id)
-
-    return jsonify({"message": f"Sliced Order Successfully for {file_id}", "file_id": file_id}), 202
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({
+        "status": "healthy",
+        "version": version,
+        "timestamp": time.time()
+    }), 200
 
 
 # run app so it can be run with flask

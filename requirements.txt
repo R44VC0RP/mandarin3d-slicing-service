@@ -1,11 +1,7 @@
 werkzeug
 flask
-boto3
 python-dotenv
 numpy-stl
-matplotlib
-pymongo
-vtkplotlib
 numpy
 stl
 requests
