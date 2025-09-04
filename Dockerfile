@@ -28,6 +28,16 @@ RUN apt-get update && apt-get install -y \
     libharfbuzz0b \
     libfontconfig1 \
     libfreetype6 \
+    libgtk-3-0 \
+    libgtk-3-dev \
+    libgdk-pixbuf-xlib-2.0-0 \
+    libcairo-gobject2 \
+    libpango-1.0-0 \
+    libatk1.0-0 \
+    libcairo2 \
+    libgdk-pixbuf-xlib-2.0-dev \
+    libpangocairo-1.0-0 \
+    xvfb \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
