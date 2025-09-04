@@ -6,3 +6,5 @@ numpy
 stl
 requests
 gunicorn
+trimesh[easy]
+pymeshlab

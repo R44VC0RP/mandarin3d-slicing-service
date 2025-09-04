@@ -1,0 +1,114 @@
+{
+  "name": "mandarin3d-slicing-service",
+  "version": "4.6.0",
+  "description": "3D file slicing microservice with multi-format support and automatic conversion",
+  "main": "app.py",
+  "scripts": {
+    "start": "make run",
+    "dev": "make dev",
+    "build": "make build",
+    "test": "make health && make test-upload",
+    "stop": "make stop",
+    "restart": "make restart",
+    "logs": "make logs",
+    "clean": "make clean",
+    "health": "make health",
+    "formats": "make formats",
+    
+    "docker:build": "docker build -t mandarin3d/mandarin3d-slicer:latest .",
+    "docker:run": "docker run -d --name mandarin3d-slicer -p 5030:5030 mandarin3d/mandarin3d-slicer:latest",
+    "docker:run-dev": "docker run -it --rm --name mandarin3d-slicer-dev -p 5030:5030 -v $(pwd):/app mandarin3d/mandarin3d-slicer:latest",
+    "docker:stop": "docker stop mandarin3d-slicer && docker rm mandarin3d-slicer",
+    "docker:logs": "docker logs -f mandarin3d-slicer",
+    "docker:shell": "docker exec -it mandarin3d-slicer /bin/bash",
+    "docker:clean": "docker stop mandarin3d-slicer; docker rm mandarin3d-slicer; docker rmi mandarin3d/mandarin3d-slicer:latest",
+    
+    "compose:up": "docker-compose up -d",
+    "compose:down": "docker-compose down",
+    "compose:build": "docker-compose build",
+    "compose:logs": "docker-compose logs -f",
+    "compose:prod": "docker-compose --profile production up -d",
+    
+    "test:health": "curl -f http://localhost:5030/health",
+    "test:formats": "curl -s http://localhost:5030/api/formats | jq .",
+    "test:upload": "curl -X POST http://localhost:5030/api/slice -F 'model_file=@test.stl' -F 'callback_url=http://httpbin.org/post' -F 'file_id=test_$(date +%s)'",
+    "test:url": "curl -X POST http://localhost:5030/api/slice -H 'Content-Type: application/json' -d '{\"file_url\":\"https://example.com/model.stl\",\"callback_url\":\"http://httpbin.org/post\",\"file_id\":\"url_test\"}'",
+    
+    "install:deps": "pip install -r requirements.txt",
+    "install:dev": "pip install -r requirements.txt flake8 black pytest",
+    
+    "lint": "flake8 app.py printslicer.py --max-line-length=120",
+    "format": "black app.py printslicer.py",
+    
+    "backup": "tar -czf backup-$(date +%Y%m%d-%H%M%S).tar.gz app.py printslicer.py config.ini requirements.txt Dockerfile docker-compose.yml version README.md docs.md",
+    
+    "version:show": "cat version",
+    "version:bump": "read -p 'Enter new version: ' NEW_VERSION && echo $NEW_VERSION > version && echo 'Version updated to:' $NEW_VERSION",
+    
+    "deploy:staging": "echo 'Add your staging deployment commands here'",
+    "deploy:production": "echo 'Add your production deployment commands here'",
+    
+    "help": "make help"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mandarin3d/slicing-service.git"
+  },
+  "keywords": [
+    "3d-printing",
+    "slicing",
+    "stl",
+    "obj",
+    "3mf",
+    "step",
+    "superslicer",
+    "docker",
+    "microservice",
+    "flask",
+    "api"
+  ],
+  "author": "Mandarin3D",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mandarin3d/slicing-service/issues"
+  },
+  "homepage": "https://github.com/mandarin3d/slicing-service#readme",
+  "engines": {
+    "node": ">=14.0.0",
+    "python": ">=3.10.0",
+    "docker": ">=20.0.0"
+  },
+  "os": [
+    "linux",
+    "darwin"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "devDependencies": {
+    "@types/node": "^18.0.0"
+  },
+  "optionalDependencies": {},
+  "config": {
+    "port": "5030",
+    "image_name": "mandarin3d/mandarin3d-slicer",
+    "container_name": "mandarin3d-slicer"
+  },
+  "docker": {
+    "image": "mandarin3d/mandarin3d-slicer",
+    "ports": {
+      "5030": "5030"
+    },
+    "volumes": {
+      "./tmp": "/app/tmp",
+      "./logs": "/app/logs"
+    }
+  },
+  "healthcheck": {
+    "url": "http://localhost:5030/health",
+    "interval": "30s",
+    "timeout": "10s",
+    "retries": 3
+  }
+}

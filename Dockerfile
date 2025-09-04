@@ -8,9 +8,28 @@ COPY ./requirements.txt /app/requirements.txt
 
 
 # install the dependencies and packages in the requirements file
-RUN apt-get update && apt-get install -y gcc build-essential
-RUN apt-get install -y --no-install-recommends bash
-RUN apt-get install -y libgl1-mesa-glx libgtk-3-0
+RUN apt-get update && apt-get install -y \
+    gcc \
+    build-essential \
+    bash \
+    libgl1-mesa-glx \
+    libgtk-3-0 \
+    libglib2.0-0 \
+    libxext6 \
+    libxrender1 \
+    libgomp1 \
+    libglu1-mesa \
+    libegl1-mesa \
+    libxrandr2 \
+    libxss1 \
+    libxcursor1 \
+    libxcomposite1 \
+    libasound2 \
+    libxi6 \
+    libxtst6 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN pip install -r requirements.txt
 
 # copy every content from the local file to the image
