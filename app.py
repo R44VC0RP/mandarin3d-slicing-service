@@ -76,6 +76,36 @@ logging.info(f"[STARTUP] Port: {os.getenv('PORT', '80')}")
 
 app = Flask(__name__)
 
+# Global error handler for unhandled exceptions
+@app.errorhandler(Exception)
+def handle_unexpected_error(error):
+    """Catch-all error handler for unhandled exceptions"""
+    logging.error(f"[GLOBAL_ERROR] ===== UNHANDLED EXCEPTION =====")
+    logging.error(f"[GLOBAL_ERROR] Error: {str(error)}")
+    logging.error(f"[GLOBAL_ERROR] Error type: {type(error).__name__}")
+    logging.error(f"[GLOBAL_ERROR] Request path: {request.path}")
+    logging.error(f"[GLOBAL_ERROR] Request method: {request.method}")
+    import traceback
+    logging.error(f"[GLOBAL_ERROR] Traceback: {traceback.format_exc()}")
+
+    return jsonify({
+        "error": "Internal server error",
+        "message": str(error),
+        "type": type(error).__name__
+    }), 500
+
+@app.errorhandler(404)
+def handle_not_found(error):
+    """Handle 404 errors"""
+    logging.warning(f"[404] Path not found: {request.path}")
+    return jsonify({"error": "Endpoint not found"}), 404
+
+@app.errorhandler(405)
+def handle_method_not_allowed(error):
+    """Handle 405 errors"""
+    logging.warning(f"[405] Method not allowed: {request.method} {request.path}")
+    return jsonify({"error": f"Method {request.method} not allowed for this endpoint"}), 405
+
 tmp_directory = 'tmp'
 # check if the tmp directory exists
 logging.info(f"[STARTUP] Checking tmp directory: {tmp_directory}")
@@ -95,41 +125,52 @@ except Exception as e:
 
 
 
-def download_file_from_url(url, download_path='tmp', filename=None):
-    """Download a file from URL to local temp directory"""
+def download_file_from_url(url, download_path='tmp', filename=None, timeout=120):
+    """Download a file from URL to local temp directory with timeout protection"""
     logging.info(f"[DOWNLOAD] Starting file download from URL: {url}")
     logging.info(f"[DOWNLOAD] Download path: {download_path}, Filename: {filename}")
-    
+    logging.info(f"[DOWNLOAD] Timeout: {timeout}s")
+
     start_time = time.time()
-    
+
     try:
         logging.info(f"[DOWNLOAD] Creating download directory: {download_path}")
         os.makedirs(download_path, exist_ok=True)
-        
+
         if filename is None:
             filename = os.path.basename(url.split('?')[0])  # Remove query parameters
             logging.info(f"[DOWNLOAD] Extracted filename from URL: {filename}")
-        
+
         # Don't force .stl extension anymore since we support multiple formats
         if not filename or '.' not in filename:
             filename = f"download_{int(time.time())}.unknown"
             logging.warning(f"[DOWNLOAD] No valid filename, using generated name: {filename}")
-            
+
         download_path_full = os.path.join(download_path, filename)
         logging.info(f"[DOWNLOAD] Full download path: {download_path_full}")
-        
+
         logging.info(f"[DOWNLOAD] Initiating HTTP request to: {url}")
-        response = requests.get(url, stream=True)
+        # Add timeout to both connection and read operations
+        response = requests.get(url, stream=True, timeout=(30, timeout))
         logging.info(f"[DOWNLOAD] HTTP response status: {response.status_code}")
-        
+
         if response.status_code == 200:
             total_bytes = 0
+            chunk_count = 0
             logging.info(f"[DOWNLOAD] Starting file write to: {download_path_full}")
+
             with open(download_path_full, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-                    total_bytes += len(chunk)
-            
+                    if chunk:
+                        f.write(chunk)
+                        total_bytes += len(chunk)
+                        chunk_count += 1
+
+                        # Log progress every 1000 chunks (8MB)
+                        if chunk_count % 1000 == 0:
+                            elapsed = time.time() - start_time
+                            logging.info(f"[DOWNLOAD] Progress: {total_bytes / 1024 / 1024:.2f}MB in {elapsed:.1f}s")
+
             download_time = time.time() - start_time
             logging.info(f"[DOWNLOAD] Successfully downloaded {total_bytes} bytes in {download_time:.2f} seconds")
             logging.info(f"[DOWNLOAD] File saved to: {download_path_full}")
@@ -138,47 +179,84 @@ def download_file_from_url(url, download_path='tmp', filename=None):
             logging.error(f"[DOWNLOAD] Failed to download file from {url}. Status code: {response.status_code}")
             logging.error(f"[DOWNLOAD] Response headers: {dict(response.headers)}")
             return None
+    except requests.exceptions.Timeout as e:
+        download_time = time.time() - start_time
+        logging.error(f"[DOWNLOAD] Download timed out after {download_time:.2f} seconds: {str(e)}")
+        logging.error(f"[DOWNLOAD] URL: {url}")
+        return None
+    except requests.exceptions.ConnectionError as e:
+        download_time = time.time() - start_time
+        logging.error(f"[DOWNLOAD] Connection error after {download_time:.2f} seconds: {str(e)}")
+        logging.error(f"[DOWNLOAD] URL: {url}")
+        return None
     except Exception as e:
         download_time = time.time() - start_time
         logging.error(f"[DOWNLOAD] Exception occurred after {download_time:.2f} seconds: {str(e)}")
         logging.error(f"[DOWNLOAD] Exception type: {type(e).__name__}")
+        import traceback
+        logging.error(f"[DOWNLOAD] Traceback: {traceback.format_exc()}")
         return None
 
-def send_callback(callback_url, result_data):
-    """Send results to callback URL"""
+def send_callback(callback_url, result_data, max_retries=3):
+    """Send results to callback URL with retry logic"""
     logging.info(f"[CALLBACK] Starting callback to: {callback_url}")
     logging.info(f"[CALLBACK] Payload keys: {list(result_data.keys())}")
     logging.info(f"[CALLBACK] Result status: {result_data.get('status', 'unknown')}")
-    
+    logging.info(f"[CALLBACK] Max retries: {max_retries}")
+
     start_time = time.time()
-    
-    try:
-        logging.info(f"[CALLBACK] Sending POST request with {len(str(result_data))} bytes of data")
-        response = requests.post(callback_url, json=result_data, timeout=30)
-        
-        callback_time = time.time() - start_time
-        logging.info(f"[CALLBACK] Received response in {callback_time:.2f} seconds")
-        logging.info(f"[CALLBACK] Response status code: {response.status_code}")
-        
-        if response.status_code == 200:
-            logging.info(f"[CALLBACK] Successfully sent callback to {callback_url}")
-            return True
-        else:
-            logging.error(f"[CALLBACK] Failed with status {response.status_code}")
-            logging.error(f"[CALLBACK] Response text: {response.text[:500]}...")  # Truncate long responses
-            logging.error(f"[CALLBACK] Response headers: {dict(response.headers)}")
-            return False
-    except requests.exceptions.Timeout:
-        logging.error(f"[CALLBACK] Request timed out after 30 seconds to {callback_url}")
-        return False
-    except requests.exceptions.ConnectionError as e:
-        logging.error(f"[CALLBACK] Connection error to {callback_url}: {str(e)}")
-        return False
-    except Exception as e:
-        callback_time = time.time() - start_time
-        logging.error(f"[CALLBACK] Exception after {callback_time:.2f} seconds: {str(e)}")
-        logging.error(f"[CALLBACK] Exception type: {type(e).__name__}")
-        return False
+    last_exception = None
+
+    for attempt in range(max_retries):
+        try:
+            if attempt > 0:
+                # Exponential backoff: 2s, 4s, 8s...
+                wait_time = 2 ** attempt
+                logging.info(f"[CALLBACK] Retry attempt {attempt + 1}/{max_retries} after {wait_time}s wait")
+                time.sleep(wait_time)
+
+            logging.info(f"[CALLBACK] Attempt {attempt + 1}: Sending POST request with {len(str(result_data))} bytes of data")
+            response = requests.post(callback_url, json=result_data, timeout=30)
+
+            callback_time = time.time() - start_time
+            logging.info(f"[CALLBACK] Received response in {callback_time:.2f} seconds")
+            logging.info(f"[CALLBACK] Response status code: {response.status_code}")
+
+            # Consider 200-299 as success
+            if 200 <= response.status_code < 300:
+                logging.info(f"[CALLBACK] Successfully sent callback to {callback_url} on attempt {attempt + 1}")
+                return True
+            else:
+                logging.warning(f"[CALLBACK] Attempt {attempt + 1} failed with status {response.status_code}")
+                logging.warning(f"[CALLBACK] Response text: {response.text[:500]}...")
+                logging.warning(f"[CALLBACK] Response headers: {dict(response.headers)}")
+
+                # Don't retry on client errors (4xx) except 408, 429
+                if 400 <= response.status_code < 500 and response.status_code not in [408, 429]:
+                    logging.error(f"[CALLBACK] Client error {response.status_code}, not retrying")
+                    return False
+
+                last_exception = Exception(f"HTTP {response.status_code}")
+
+        except requests.exceptions.Timeout as e:
+            logging.warning(f"[CALLBACK] Attempt {attempt + 1} timed out after 30 seconds to {callback_url}")
+            last_exception = e
+        except requests.exceptions.ConnectionError as e:
+            logging.warning(f"[CALLBACK] Attempt {attempt + 1} connection error to {callback_url}: {str(e)}")
+            last_exception = e
+        except Exception as e:
+            callback_time = time.time() - start_time
+            logging.warning(f"[CALLBACK] Attempt {attempt + 1} exception after {callback_time:.2f} seconds: {str(e)}")
+            logging.warning(f"[CALLBACK] Exception type: {type(e).__name__}")
+            last_exception = e
+
+    # All retries exhausted
+    total_time = time.time() - start_time
+    logging.error(f"[CALLBACK] All {max_retries} attempts failed after {total_time:.2f} seconds")
+    logging.error(f"[CALLBACK] Final error: {str(last_exception)}")
+    import traceback
+    logging.error(f"[CALLBACK] Traceback: {traceback.format_exc()}")
+    return False
 
 def get_file_extension(filename):
     """Get file extension in lowercase"""
@@ -413,32 +491,48 @@ def convert_file_to_stl(input_path, file_id=None):
     return None
 
 def process_3d_file(file_path, callback_url, file_id=None, max_dimensions=None):
-    """Process 3D file (convert if needed) and send results to callback URL"""
+    """
+    Process 3D file (convert if needed) and send results to callback URL
+
+    This function ALWAYS sends a callback, even on catastrophic failures.
+    It wraps all processing in comprehensive error handling to ensure
+    the client always receives feedback about their request.
+    """
     logging.info(f"[PROCESS] ===== STARTING 3D FILE PROCESSING =====")
     logging.info(f"[PROCESS] File path: {file_path}")
     logging.info(f"[PROCESS] Callback URL: {callback_url}")
     logging.info(f"[PROCESS] File ID: {file_id}")
     logging.info(f"[PROCESS] Max dimensions: {max_dimensions}")
-    
+
     start_time = time.time()
-    
+    stl_path = None
+
     # Set default max dimensions if not provided
     if max_dimensions is None:
         max_dimensions = {'x': 300, 'y': 300, 'z': 300}
         logging.info(f"[PROCESS] Using default max dimensions: {max_dimensions}")
-    
+
     # Log system information for Docker debugging
     logging.info(f"[PROCESS] Current working directory: {os.getcwd()}")
     logging.info(f"[PROCESS] Temp directory: {tmp_directory}")
     logging.info(f"[PROCESS] Python version: {os.sys.version}")
-    
+
     # Check if input file exists and get info
     if os.path.exists(file_path):
         file_size = os.path.getsize(file_path)
         logging.info(f"[PROCESS] Input file exists, size: {file_size} bytes")
     else:
         logging.error(f"[PROCESS] Input file does not exist: {file_path}")
-    
+        error_data = {
+            "file_id": file_id,
+            "status": "error",
+            "error": "Input file does not exist",
+            "processing_time": time.time() - start_time,
+            "timestamp": time.time()
+        }
+        send_callback(callback_url, error_data)
+        return error_data
+
     try:
         logging.info(f"[PROCESS] Starting 3D file processing for file: {file_path}")
         
@@ -569,28 +663,83 @@ def process_3d_file(file_path, callback_url, file_id=None, max_dimensions=None):
         logging.error(f"[PROCESS] Exception after {processing_time:.2f}s: {str(e)}")
         logging.error(f"[PROCESS] Exception type: {type(e).__name__}")
         logging.error(f"[PROCESS] File path: {file_path}")
-        
+        import traceback
+        logging.error(f"[PROCESS] Full traceback: {traceback.format_exc()}")
+
+        # Clean up temporary files on error
+        cleanup_files = []
+        if file_path and os.path.exists(file_path):
+            cleanup_files.append(file_path)
+        if stl_path and os.path.exists(stl_path) and stl_path != file_path:
+            cleanup_files.append(stl_path)
+
+        for cleanup_file in cleanup_files:
+            try:
+                os.remove(cleanup_file)
+                logging.info(f"[PROCESS] Cleaned up temporary file on error: {cleanup_file}")
+            except Exception as cleanup_error:
+                logging.warning(f"[PROCESS] Failed to clean up {cleanup_file}: {cleanup_error}")
+
         error_data = {
             "file_id": file_id,
-            "status": "error", 
+            "status": "error",
             "error": f"Processing error: {str(e)}",
+            "error_type": type(e).__name__,
             "processing_time": processing_time,
             "timestamp": time.time()
         }
-        
-        logging.info(f"[PROCESS] Sending error callback...")
-        send_callback(callback_url, error_data)
-        return error_data
 
+        logging.info(f"[PROCESS] Sending error callback...")
+        try:
+            send_callback(callback_url, error_data)
+        except Exception as callback_error:
+            # Even if callback fails, log it but don't raise
+            logging.error(f"[PROCESS] CRITICAL: Callback failed after processing error: {callback_error}")
+            logging.error(f"[PROCESS] Original error data: {error_data}")
+
+        return error_data
+    finally:
+        # Ensure garbage collection runs to free memory
+        logging.info(f"[PROCESS] Running garbage collection")
+        gc.collect()
+
+
+def validate_url(url, field_name="URL"):
+    """Validate URL format"""
+    if not url:
+        return False, f"{field_name} is required"
+    if not isinstance(url, str):
+        return False, f"{field_name} must be a string"
+    if not url.startswith(('http://', 'https://')):
+        return False, f"{field_name} must start with http:// or https://"
+    if len(url) > 2048:
+        return False, f"{field_name} is too long (max 2048 characters)"
+    return True, None
+
+def validate_max_dimensions(max_dimensions):
+    """Validate max_dimensions structure"""
+    if not isinstance(max_dimensions, dict):
+        return False, "max_dimensions must be an object"
+    required_keys = {'x', 'y', 'z'}
+    if not required_keys.issubset(max_dimensions.keys()):
+        return False, f"max_dimensions must contain keys: {required_keys}"
+    for key in required_keys:
+        try:
+            val = float(max_dimensions[key])
+            if val <= 0 or val > 10000:
+                return False, f"max_dimensions.{key} must be between 0 and 10000"
+        except (TypeError, ValueError):
+            return False, f"max_dimensions.{key} must be a number"
+    return True, None
 
 @app.route('/api/slice', methods=['POST'])
 def slice_3d_file():
     """
     Process 3D file (STL, OBJ, 3MF, STEP, etc.) and return results via callback
-    
-    Supported formats: STL, OBJ, PLY, OFF, 3MF, GLTF, GLB, DAE, X3D, WRL, VRML, 
+
+    Supported formats: STL, OBJ, PLY, OFF, 3MF, GLTF, GLB, DAE, X3D, WRL, VRML,
                       STEP, STP, IGES, IGS, COLLADA, BLEND
-    
+
     Request body can be:
     1. JSON with file URL:
     {
@@ -600,11 +749,11 @@ def slice_3d_file():
         "file_name": "model.stl",  // optional: use when URL lacks filename/extension
         "max_dimensions": {"x": 300, "y": 300, "z": 300}  // optional
     }
-    
+
     2. Form-data with file upload:
     - model_file: 3D model file (STL, OBJ, 3MF, STEP, etc.)
     - callback_url: callback URL
-    - file_id: optional file identifier 
+    - file_id: optional file identifier
     - max_x, max_y, max_z: optional dimension limits
     """
     request_start_time = time.time()
@@ -614,29 +763,47 @@ def slice_3d_file():
     logging.info(f"[API] Request is_json: {request.is_json}")
     logging.info(f"[API] Request remote_addr: {request.remote_addr}")
     logging.info(f"[API] Request user_agent: {request.headers.get('User-Agent', 'Unknown')}")
-    
+
     try:
         # Check if it's JSON request (URL) or form-data (file upload)
         if request.is_json:
             logging.info(f"[API] Processing JSON request (URL download)...")
             data = request.get_json()
             logging.info(f"[API] JSON keys received: {list(data.keys())}")
-            
+
             file_url = data.get('file_url') or data.get('stl_url')  # Support old parameter name
             callback_url = data.get('callback_url')
             file_id = data.get('file_id')
             provided_file_name = data.get('file_name')  # Optional filename when URL lacks it
             max_dimensions = data.get('max_dimensions', {'x': 300, 'y': 300, 'z': 300})
-            
+
             logging.info(f"[API] File URL: {file_url}")
             logging.info(f"[API] Callback URL: {callback_url}")
             logging.info(f"[API] File ID: {file_id}")
             logging.info(f"[API] Provided filename: {provided_file_name}")
             logging.info(f"[API] Max dimensions: {max_dimensions}")
-            
+
+            # Validate required parameters
             if not file_url or not callback_url:
                 logging.error(f"[API] Missing required parameters - file_url: {bool(file_url)}, callback_url: {bool(callback_url)}")
                 return jsonify({"error": "file_url and callback_url are required"}), 400
+
+            # Validate URLs
+            valid, error = validate_url(file_url, "file_url")
+            if not valid:
+                logging.error(f"[API] Invalid file_url: {error}")
+                return jsonify({"error": error}), 400
+
+            valid, error = validate_url(callback_url, "callback_url")
+            if not valid:
+                logging.error(f"[API] Invalid callback_url: {error}")
+                return jsonify({"error": error}), 400
+
+            # Validate max_dimensions
+            valid, error = validate_max_dimensions(max_dimensions)
+            if not valid:
+                logging.error(f"[API] Invalid max_dimensions: {error}")
+                return jsonify({"error": error}), 400
             
             # Determine filename for validation and storage
             logging.info(f"[API] Determining filename for validation...")
@@ -705,18 +872,34 @@ def slice_3d_file():
             
             callback_url = request.form.get('callback_url')
             file_id = request.form.get('file_id')
-            
+
             logging.info(f"[API] Callback URL: {callback_url}")
             logging.info(f"[API] File ID: {file_id}")
             logging.info(f"[API] Uploaded filename: {file.filename}")
-            
+
+            # Validate callback URL
             if not callback_url:
                 logging.error(f"[API] Missing callback_url in form data")
                 return jsonify({"error": "callback_url is required"}), 400
-            
+
+            valid, error = validate_url(callback_url, "callback_url")
+            if not valid:
+                logging.error(f"[API] Invalid callback_url: {error}")
+                return jsonify({"error": error}), 400
+
+            # Validate file
             if file.filename == '':
                 logging.error(f"[API] Empty filename provided")
                 return jsonify({"error": "No file selected"}), 400
+
+            # Check file size (max 500MB)
+            file.seek(0, os.SEEK_END)
+            file_size = file.tell()
+            file.seek(0)
+            if file_size > 500 * 1024 * 1024:
+                logging.error(f"[API] File too large: {file_size} bytes")
+                return jsonify({"error": "File size exceeds 500MB limit"}), 400
+            logging.info(f"[API] File size: {file_size} bytes")
             
             # Check if format is supported
             logging.info(f"[API] Checking format support for uploaded file: {file.filename}")
@@ -753,15 +936,47 @@ def slice_3d_file():
         # Start processing in background thread
         request_time = time.time() - request_start_time
         logging.info(f"[API] Request processing completed in {request_time:.2f}s, starting background thread...")
-        
+
         def process_async():
-            with app.app_context():
-                logging.info(f"[API] Background thread started for file processing")
-                process_3d_file(file_path, callback_url, file_id, max_dimensions)
-                logging.info(f"[API] Background processing completed, running garbage collection")
-                gc.collect()
-        
-        thread = threading.Thread(target=process_async)
+            """
+            Background thread wrapper that ensures catastrophic failures
+            are caught and callbacks are sent even if thread crashes
+            """
+            thread_start_time = time.time()
+            try:
+                with app.app_context():
+                    logging.info(f"[API] Background thread started for file processing")
+                    logging.info(f"[API] File: {file_path}, Callback: {callback_url}, ID: {file_id}")
+                    process_3d_file(file_path, callback_url, file_id, max_dimensions)
+                    logging.info(f"[API] Background processing completed, running garbage collection")
+                    gc.collect()
+            except Exception as thread_error:
+                # Catastrophic failure in background thread
+                thread_time = time.time() - thread_start_time
+                logging.error(f"[API] ===== CATASTROPHIC BACKGROUND THREAD FAILURE =====")
+                logging.error(f"[API] Thread crashed after {thread_time:.2f}s: {str(thread_error)}")
+                logging.error(f"[API] Error type: {type(thread_error).__name__}")
+                import traceback
+                logging.error(f"[API] Full traceback: {traceback.format_exc()}")
+
+                # Attempt to send error callback as last resort
+                try:
+                    error_data = {
+                        "file_id": file_id,
+                        "status": "error",
+                        "error": f"Server processing failure: {str(thread_error)}",
+                        "error_type": type(thread_error).__name__,
+                        "processing_time": thread_time,
+                        "timestamp": time.time()
+                    }
+                    logging.error(f"[API] Attempting emergency callback after thread crash")
+                    send_callback(callback_url, error_data)
+                except Exception as emergency_error:
+                    logging.error(f"[API] CRITICAL: Emergency callback also failed: {emergency_error}")
+                    logging.error(f"[API] File ID: {file_id}, Callback URL: {callback_url}")
+
+        thread = threading.Thread(target=process_async, name=f"process-{file_id or 'unknown'}")
+        thread.daemon = False  # Ensure thread completes even if main process wants to exit
         thread.start()
         
         response_data = {
